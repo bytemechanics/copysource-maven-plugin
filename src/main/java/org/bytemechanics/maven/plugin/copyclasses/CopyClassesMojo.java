@@ -89,6 +89,7 @@ import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
 @Mojo(name = "copy-classes", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
 public class CopyClassesMojo extends AbstractMojo {
 
+	private static final String METAINF = "META-INF";
 
 	/**
 	 * Artifact resolver, needed to download source jars for inclusion in classpath.
@@ -129,7 +130,7 @@ public class CopyClassesMojo extends AbstractMojo {
 
 		try{
 			generatedSourcesPath=Paths.get(this.project.getBuild().getDirectory(),"generated-sources",this.generatedSourceFolder);
-			Files.createDirectories(generatedSourcesPath.resolve("META-INF"));
+			Files.createDirectories(generatedSourcesPath.resolve(METAINF));
 			this.project.addCompileSourceRoot(generatedSourcesPath.toString());
 			getLog().debug(MessageFormat.format("Generated source folder: {0}",generatedSourcesPath));
 		}catch(IOException e){
@@ -145,21 +146,7 @@ public class CopyClassesMojo extends AbstractMojo {
 				getLog().debug(MessageFormat.format("Found: {0}",artifact));
 				final File file=artifact.getFile();
 				getLog().debug(MessageFormat.format("Downloaded source: {0}",file));
-				try(JarFile sourcePackage=new JarFile(file,true,JarFile.OPEN_READ)){
-					for(String clazz:copy.getClasses()){
-						getLog().debug(MessageFormat.format("Looking for class {0}",clazz));
-						final JarEntry sourceEntry=sourcePackage.getJarEntry(clazz.replace('.','/')+".java");
-						if(sourceEntry==null){
-							throw new MojoExecutionException(MessageFormat.format("Unable find class {0} at source {1} from artifact {2}",clazz,file,artifact));
-						}
-						getLog().debug(MessageFormat.format("Creating package {0} destiny",clazz));
-						final Path generatedSourceFile=generatePackage(generatedSourcesPath, clazz, copy);
-						getLog().debug(MessageFormat.format("Extracting class {0} source",clazz));
-						copySource(sourcePackage, sourceEntry, copy, generatedSourceFile, sourceEncoding, file, clazz, artifact);
-					}
-				}catch(JarException e){
-					throw new MojoExecutionException(MessageFormat.format("Unable to open source {0} from artifact {1}",file,artifact), e);
-				}
+				processDownloadedSource(file, copy, generatedSourcesPath, sourceEncoding);
 			}catch(MojoExecutionException e){
 				throw e;
 			}catch(Exception e){
@@ -168,7 +155,7 @@ public class CopyClassesMojo extends AbstractMojo {
 		}
 		
 		getLog().debug("Write copy manifest");
-		try(BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(generatedSourcesPath.resolve("META-INF").resolve("copy-manifest.info"),sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
+		try(BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(generatedSourcesPath.resolve(METAINF).resolve("copy-manifest.info"),sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
 			sourceWriter.write("The following classes has been copied from external libraries:\n\n");
 			for(CopyDefinition copy:copies){
 				sourceWriter.write(MessageFormat.format("From artifact [{0}]:\n", copy.getArtifact()));
@@ -180,10 +167,30 @@ public class CopyClassesMojo extends AbstractMojo {
 			throw new MojoExecutionException("Unable create manifest file", e);
 		}
 		final Resource resource=new Resource();
-		resource.setDirectory(generatedSourcesPath.resolve("META-INF").toString());
-		resource.setTargetPath("META-INF");
+		resource.setDirectory(generatedSourcesPath.resolve(METAINF).toString());
+		resource.setTargetPath(METAINF);
 		this.project.addResource(resource);
 	}
+
+	private void processDownloadedSource(final File _file,final CopyDefinition _copy,final Path _generatedSourcesPath, final Charset _sourceEncoding) throws IOException, MojoExecutionException {
+		
+		try(JarFile sourcePackage=new JarFile(_file,true,JarFile.OPEN_READ)){
+			for(String clazz:_copy.getClasses()){
+				getLog().debug(MessageFormat.format("Looking for class {0}",clazz));
+				final JarEntry sourceEntry=sourcePackage.getJarEntry(clazz.replace('.','/')+".java");
+				if(sourceEntry==null){
+					throw new MojoExecutionException(MessageFormat.format("Unable find class {0} at source {1} from artifact {2}",clazz,_file,_copy.getArtifact()));
+				}
+				getLog().debug(MessageFormat.format("Creating package {0} destiny",clazz));
+				final Path generatedSourceFile=generatePackage(_generatedSourcesPath, clazz, _copy);
+				getLog().debug(MessageFormat.format("Extracting class {0} source",clazz));
+				copySource(sourcePackage, sourceEntry, _copy, generatedSourceFile, _sourceEncoding, _file, clazz);
+			}
+		}catch(JarException e){
+			throw new MojoExecutionException(MessageFormat.format("Unable to open source {0} from artifact {1}",_file,_copy.getArtifact()), e);
+		}
+	}
+
 	private Path generatePackage(final Path _generatedSourcesPath, final String _clazz,final CopyDefinition _copy) throws MojoExecutionException {
 		
 		final Path reply;
@@ -200,7 +207,7 @@ public class CopyClassesMojo extends AbstractMojo {
 		return reply;
 	}
 
-	private void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _file,final String _clazz,final Artifact _artifact) throws MojoExecutionException {
+	private void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _file,final String _clazz) throws MojoExecutionException {
 
 		try(BufferedReader sourceReader=new BufferedReader(new InputStreamReader(_sourcePackage.getInputStream(_sourceEntry),Charset.forName(_copy.getSourceCharset())));
 				BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(_generatedSourceFile,_sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
@@ -234,7 +241,7 @@ public class CopyClassesMojo extends AbstractMojo {
 				line=sourceReader.readLine();
 			}
 		}catch(IOException|IllegalCharsetNameException|UnsupportedCharsetException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable read source {0} class {1} from artifact {2} with charset {3}",_file,_clazz,_artifact,_copy.getSourceCharset()), e);
+			throw new MojoExecutionException(MessageFormat.format("Unable read source {0} class {1} from artifact {2} with charset {3}",_file,_clazz,_copy.getArtifact(),_copy.getSourceCharset()), e);
 		}
 	}
 	
@@ -262,7 +269,7 @@ public class CopyClassesMojo extends AbstractMojo {
 
 
 		for(String javaType:javaTypes){
-			reply|=(processingLine.startsWith(javaType+" "))|(processingLine.contains(" "+javaType+" "));
+			reply|=(processingLine.startsWith(javaType+" "))||(processingLine.contains(" "+javaType+" "));
 		}
 
 		return reply;
