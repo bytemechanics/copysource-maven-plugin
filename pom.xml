@@ -10,7 +10,7 @@
 	<artifactId>copysource-maven-plugin</artifactId>
 	<version>0.1.0-SNAPSHOT</version>
 	<packaging>maven-plugin</packaging>
-	<name>Copy classes maven plugin</name>
+	<name>Copy sources maven plugin</name>
 	<description>Maven pluguin to copy and repackage sources to reduce library dependencies</description>
 	<url>http://www.bytemechanics.org</url>
 	<developers>
