@@ -1,4 +1,9 @@
 # Copy Sources maven plugin
+[![Latest version](https://maven-badges.herokuapp.com/maven-central/org.bytemechanics.maven/copysource-maven-plugin/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.bytemechanics.maven/copysource-maven-plugin/badge.svg)
+[![Quality Gate](https://sonarcloud.io/api/badges/gate?key=org.bytemechanics.maven%3Acopysource-maven-plugin)](https://sonarcloud.io/dashboard/index/org.bytemechanics.maven%3Acopysource-maven-plugin)
+[![Coverage](https://sonarcloud.io/api/badges/measure?key=org.bytemechanics.maven%3Acopysource-maven-plugin&metric=coverage)](https://sonarcloud.io/dashboard/index/org.bytemechanics.maven%3Acopysource-maven-plugin)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
+
 Maven pluguin to copy and repackage sources to reduce library dependencies
 
 ## Motivation
