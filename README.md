@@ -6,6 +6,8 @@
 
 Maven pluguin to copy and repackage sources to reduce library dependencies
 
+_**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries, for final projects if you want to build a uber-jar maven already has it's shade plugin that works perfectly**_
+
 ## Motivation
 To keep the dependency hell away from your projects its important to reduce at minimum the dependencies of each library. But at te same time this can break the code reutilization principle, to avoid this flag
 the solution comes by copying the source code and repackaging in order to avoid collisions. But this is only necessary when you need ONLY some specific classes, if you need the full library then you should add
