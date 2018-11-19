@@ -1,6 +1,6 @@
 # Copy Sources maven plugin
 [![Latest version](https://maven-badges.herokuapp.com/maven-central/org.bytemechanics.maven/copysource-maven-plugin/badge.svg)](https://maven-badges.herokuapp.com/maven-central/org.bytemechanics.maven/copysource-maven-plugin/badge.svg)
-[![Quality Gate](https://sonarcloud.io/api/badges/gate?key=org.bytemechanics.maven%3Acopysource-maven-plugin)](https://sonarcloud.io/dashboard/index/org.bytemechanics.maven%3Acopysource-maven-plugin)
+[![Quality Gate](https://sonarcloud.io/api/project_badges/measure?key=org.bytemechanics.maven%3Acopysource-maven-plugin&metric=alert_status)](https://sonarcloud.io/dashboard/index/org.bytemechanics.maven%3Acopysource-maven-plugin)
 [![Coverage](https://sonarcloud.io/api/badges/measure?key=org.bytemechanics.maven%3Acopysource-maven-plugin&metric=coverage)](https://sonarcloud.io/dashboard/index/org.bytemechanics.maven%3Acopysource-maven-plugin)
 [![License](https://img.shields.io/badge/License-Apache%202.0-blue.svg)](https://opensource.org/licenses/Apache-2.0)
 
@@ -23,7 +23,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
 			<plugin>
 				<groupId>org.bytemechanics.maven</groupId>
 				<artifactId>copyclasses-maven-plugin</artifactId>
-				<version>0.1.0-SNAPSHOT</version>
+				<version>X.X.X</version>
 			</plugin>
 			(...)
 		</plugins>
@@ -39,7 +39,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
 			<plugin>
 				<groupId>org.bytemechanics.maven</groupId>
 				<artifactId>copyclasses-maven-plugin</artifactId>
-				<version>0.1.0-SNAPSHOT</version>
+				<version>X.X.X</version>
 				<executions>
 					<execution>
 						<goals>
@@ -62,7 +62,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
 			<plugin>
 				<groupId>org.bytemechanics.maven</groupId>
 				<artifactId>copyclasses-maven-plugin</artifactId>
-				<version>0.1.0-SNAPSHOT</version>
+				<version>X.X.X</version>
 				<executions>
 					<execution>
 						<goals>
