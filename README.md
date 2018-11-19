@@ -91,4 +91,4 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
    (...)
    ```
    
-  (Please read our [Javadoc](https://copysource-maven-plugin/docs/javadoc/index.html) for further information)
+  (Please read our [Javadoc](https://copysource-maven-plugin/javadoc/index.html) for further information)
