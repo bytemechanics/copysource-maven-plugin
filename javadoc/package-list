@@ -1,0 +1,3 @@
+org.bytemechanics.maven.plugin.copyclasses
+org.bytemechanics.maven.plugin.copyclasses.beans
+org.bytemechanics.maven.plugin.copyclasses.enums
