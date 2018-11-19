@@ -55,17 +55,18 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
  *		&lt;/plugin&gt;
  *	</code>
  */
-@Mojo(name = "copy-classes", defaultPhase = LifecyclePhase.GENERATE_SOURCES)
-public class CopyClassesMojo extends CopyClassesBase {
 
-	public CopyClassesMojo() {
+@Mojo(name = "copy-test-classes", defaultPhase = LifecyclePhase.GENERATE_TEST_SOURCES)
+public class CopyTestClassesMojo extends CopyClassesBase {
+
+	public CopyTestClassesMojo() {
 	}
-	public CopyClassesMojo(ArtifactResolver artifactResolver, MavenSession session, MavenProject project, CopyDefinition[] copies, String generatedSourceFolder) {
+	public CopyTestClassesMojo(ArtifactResolver artifactResolver, MavenSession session, MavenProject project, CopyDefinition[] copies, String generatedSourceFolder) {
 		super(artifactResolver, session, project, copies, generatedSourceFolder);
 	}
 	
 	@Override
 	public void execute() throws MojoExecutionException {
-		generateSources(Scope.SRC);
+		generateSources(Scope.TEST);
 	}
 }
