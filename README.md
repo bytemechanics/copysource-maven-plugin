@@ -90,3 +90,5 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
    </build>	
    (...)
    ```
+   
+  (Please read our [Javadoc](https://copysource-maven-plugin/docs/javadoc/index.html) for further information)
