@@ -32,10 +32,6 @@ import java.time.LocalDateTime;
 import java.util.jar.JarEntry;
 import java.util.jar.JarException;
 import java.util.jar.JarFile;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
@@ -46,8 +42,9 @@ import org.apache.maven.plugins.annotations.Parameter;
 import org.apache.maven.project.DefaultProjectBuildingRequest;
 import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingRequest;
-import org.apache.maven.shared.artifact.resolve.ArtifactResolver;
+import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolver;
 import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
+import org.bytemechanics.maven.plugin.copyclasses.enums.GeneratedFactory;
 import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 
 /**
@@ -81,10 +78,6 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
  *		&lt;/plugin&gt;
  *	</code>
  */
-@Getter
-@Setter
-@AllArgsConstructor
-@NoArgsConstructor
 public abstract class CopyClassesBase extends AbstractMojo {
 
 	
@@ -118,6 +111,56 @@ public abstract class CopyClassesBase extends AbstractMojo {
 	@Parameter(defaultValue = "copies", required = true)
 	protected String generatedSourceFolder;
 	
+	private final LocalDateTime executionTime;
+
+	public CopyClassesBase() {
+		this.executionTime=LocalDateTime.now();
+	}
+	public CopyClassesBase(final ArtifactResolver _artifactResolver, final MavenSession _session, final MavenProject _project, final CopyDefinition[] _copies, final String _generatedSourceFolder) {
+		this();
+		this.artifactResolver = _artifactResolver;
+		this.session = _session;
+		this.project = _project;
+		this.copies = _copies;
+		this.generatedSourceFolder = _generatedSourceFolder;
+	}
+
+	
+	public ArtifactResolver getArtifactResolver() {
+		return artifactResolver;
+	}
+	public void setArtifactResolver(ArtifactResolver artifactResolver) {
+		this.artifactResolver = artifactResolver;
+	}
+
+	public MavenSession getSession() {
+		return session;
+	}
+	public void setSession(MavenSession session) {
+		this.session = session;
+	}
+
+	public MavenProject getProject() {
+		return project;
+	}
+	public void setProject(MavenProject project) {
+		this.project = project;
+	}
+
+	public CopyDefinition[] getCopies() {
+		return copies;
+	}
+	public void setCopies(CopyDefinition[] copies) {
+		this.copies = copies;
+	}
+
+	public String getGeneratedSourceFolder() {
+		return generatedSourceFolder;
+	}
+	public void setGeneratedSourceFolder(String generatedSourceFolder) {
+		this.generatedSourceFolder = generatedSourceFolder;
+	}
+
 	
 	protected void generateSources(final Scope _scope) throws MojoExecutionException {
 		
@@ -208,8 +251,16 @@ public abstract class CopyClassesBase extends AbstractMojo {
 		return reply;
 	}
 
+	private GeneratedFactory getImport(){
+	
+		final String version=this.project.getProperties().getProperty("maven.compiler.target","1.8");
+		return GeneratedFactory.from(version);
+	}
+	
 	private void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _file,final String _clazz) throws MojoExecutionException {
 
+		final GeneratedFactory factory=getImport();
+		
 		try(BufferedReader sourceReader=new BufferedReader(new InputStreamReader(_sourcePackage.getInputStream(_sourceEntry),Charset.forName(_copy.getSourceCharset())));
 				BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(_generatedSourceFile,_sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
 			String line=sourceReader.readLine();
@@ -230,13 +281,13 @@ public abstract class CopyClassesBase extends AbstractMojo {
 				line=line.replaceAll(_copy.toRegexPackage(),_copy.getToPackage());
 				getLog().debug(MessageFormat.format("Modified class {0} line {1}",_clazz,line));
 				if((!isInComment)&&(!mainFound)&&(isMainTypeDefinition(line))){
-					sourceWriter.write(MessageFormat.format("@Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from {0}\", date = \"{1}\")\n", _copy.toCoordinate(),LocalDateTime.now()));
+					sourceWriter.write(factory.getAnnotation(_copy,this.executionTime));
 					mainFound=true;
 				}
 				sourceWriter.write(line);
 				sourceWriter.write('\n');
 				if((!isInComment)&&(packageFound)&&(!importAdded)){
-					sourceWriter.write("import javax.annotation.Generated;\n");
+					sourceWriter.write(factory.getImport());
 					importAdded=true;
 				}
 				line=sourceReader.readLine();
