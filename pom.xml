@@ -93,6 +93,31 @@
 				<artifactId>maven-plugin-plugin</artifactId>
 				<version>3.6.0</version>
 			</plugin>
+			<plugin>
+				<groupId>org.bytemechanics.maven</groupId>
+				<artifactId>copysource-maven-plugin</artifactId>
+				<version>1.1.0</version>
+				<executions>
+					<execution>
+						<id>copy-classes</id>
+						<goals>
+							<goal>copy-classes</goal>
+						</goals>
+						<configuration>
+							<copies>
+								<copy>
+									<artifact>org.bytemechanics:copy-commons:1.5.0</artifact>
+									<classes>
+										<class>org.bytemechanics.commons.functional.LambdaUnchecker</class>
+									</classes>
+									<fromPackage>org.bytemechanics.commons</fromPackage>
+									<toPackage>org.bytemechanics.maven.plugin.copyclasses.internal.commons</toPackage>
+								</copy>
+							</copies>
+						</configuration>
+					</execution>
+				</executions>
+			</plugin>
 		</plugins>
 	</build>
 </project>

@@ -29,9 +29,11 @@ import java.nio.file.Paths;
 import java.nio.file.StandardOpenOption;
 import java.text.MessageFormat;
 import java.time.LocalDateTime;
+import java.util.Optional;
 import java.util.jar.JarEntry;
 import java.util.jar.JarException;
 import java.util.jar.JarFile;
+import java.util.stream.Stream;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
@@ -216,7 +218,7 @@ public abstract class CopyClassesBase extends AbstractMojo {
 		this.project.addResource(resource);
 	}
 
-	private void processDownloadedSource(final File _file,final CopyDefinition _copy,final Path _generatedSourcesPath, final Charset _sourceEncoding) throws IOException, MojoExecutionException {
+	protected void processDownloadedSource(final File _file,final CopyDefinition _copy,final Path _generatedSourcesPath, final Charset _sourceEncoding) throws IOException, MojoExecutionException {
 		
 		try(JarFile sourcePackage=new JarFile(_file,true,JarFile.OPEN_READ)){
 			for(String clazz:_copy.getClasses()){
@@ -226,40 +228,46 @@ public abstract class CopyClassesBase extends AbstractMojo {
 					throw new MojoExecutionException(MessageFormat.format("Unable find class {0} at source {1} from artifact {2}",clazz,_file,_copy.getArtifact()));
 				}
 				getLog().debug(MessageFormat.format("Creating package {0} destiny",clazz));
-				final Path generatedSourceFile=generatePackage(_generatedSourcesPath, clazz, _copy);
-				getLog().debug(MessageFormat.format("Extracting class {0} source",clazz));
-				copySource(sourcePackage, sourceEntry, _copy, generatedSourceFile, _sourceEncoding, _file, clazz);
+				final Optional<Path> generatedSourceFile=generateSourceFile(_generatedSourcesPath, clazz, _copy);
+				if(generatedSourceFile.isPresent()){
+					final Path sourceFile=generatedSourceFile.get();
+					generatePackage(sourceFile);
+					getLog().debug(MessageFormat.format("Extracting class {0} source",clazz));
+					copySource(sourcePackage, sourceEntry, _copy, sourceFile, _sourceEncoding, _file, clazz);
+				}
 			}
-		}catch(JarException e){
+		}catch(JarException|MojoExecutionException e){
 			throw new MojoExecutionException(MessageFormat.format("Unable to open source {0} from artifact {1}",_file,_copy.getArtifact()), e);
 		}
 	}
 
-	private Path generatePackage(final Path _generatedSourcesPath, final String _clazz,final CopyDefinition _copy) throws MojoExecutionException {
+	protected Optional<Path> generateSourceFile(final Path _generatedSourcesPath, final String _className,final CopyDefinition _copy) {
 		
-		final Path reply;
-		
-		try{
-			reply=_generatedSourcesPath.resolve(_clazz
-													.replaceAll(_copy.toRegexPackage(),_copy.getToPackage())
-													.replace('.','/')+".java");
-			Files.createDirectories(reply.getParent());
-		}catch(IOException e){
-			throw new MojoExecutionException(MessageFormat.format("Failed creating new package to copy: {0}",_copy), e);
-		}
-		
-		return reply;
+		return Optional.ofNullable(_className)
+							.map(className -> className.replaceAll(_copy.getFromPackageRegex(),_copy.getToPackage()))
+							.map(className -> className.replace('.','/'))
+							.map(className -> className.concat(".java"))
+							.map(_generatedSourcesPath::resolve);
 	}
 
-	private GeneratedFactory getImport(){
+	protected void generatePackage(final Path _generatedSource) throws MojoExecutionException {
+		
+		try{
+			Files.createDirectories(_generatedSource.getParent());
+		}catch(IOException e){
+			throw new MojoExecutionException(MessageFormat.format("Failed creating new package for file: {0}",_generatedSource), e);
+		}
+	}
+
+	protected GeneratedFactory getGeneratedFactory(){
 	
 		final String version=this.project.getProperties().getProperty("maven.compiler.target","1.8");
 		return GeneratedFactory.from(version);
 	}
 	
-	private void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _file,final String _clazz) throws MojoExecutionException {
+	protected void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _sourceFile,final String _clazz) throws MojoExecutionException {
 
-		final GeneratedFactory factory=getImport();
+		final GeneratedFactory factory=getGeneratedFactory();
 		
 		try(BufferedReader sourceReader=new BufferedReader(new InputStreamReader(_sourcePackage.getInputStream(_sourceEntry),Charset.forName(_copy.getSourceCharset())));
 				BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(_generatedSourceFile,_sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
@@ -278,7 +286,7 @@ public abstract class CopyClassesBase extends AbstractMojo {
 					}
 				}
 				getLog().debug(MessageFormat.format("Extracted class {0} line {1}",_clazz,line));
-				line=line.replaceAll(_copy.toRegexPackage(),_copy.getToPackage());
+				line=line.replaceAll(_copy.getFromPackageRegex(),_copy.getToPackage());
 				getLog().debug(MessageFormat.format("Modified class {0} line {1}",_clazz,line));
 				if((!isInComment)&&(!mainFound)&&(isMainTypeDefinition(line))){
 					sourceWriter.write(factory.getAnnotation(_copy,this.executionTime));
@@ -293,37 +301,44 @@ public abstract class CopyClassesBase extends AbstractMojo {
 				line=sourceReader.readLine();
 			}
 		}catch(IOException|IllegalCharsetNameException|UnsupportedCharsetException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable read source {0} class {1} from artifact {2} with charset {3}",_file,_clazz,_copy.getArtifact(),_copy.getSourceCharset()), e);
+			throw new MojoExecutionException(MessageFormat.format("Unable read source {0} class {1} from artifact {2} with charset {3}",_sourceFile,_clazz,_copy.getArtifact(),_copy.getSourceCharset()), e);
 		}
 	}
 	
-	private boolean isPackage(final String _line){
+	protected boolean isPackage(final String _line){
 		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.startsWith("package ");
+		return Optional.ofNullable(_line)
+						.map(String::trim)
+						.map(String::toLowerCase)
+						.map(val -> val.startsWith("package "))
+						.orElse(false);
 	}
-	private boolean isBeginComment(final String _line){
+	protected boolean isBeginComment(final String _line){
 		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.contains("/*");
+		return Optional.ofNullable(_line)
+						.map(String::trim)
+						.map(String::toLowerCase)
+						.map(val -> val.contains("/*"))
+						.orElse(false);
 	}
-	private boolean isEndComment(final String _line){
-		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.contains("*/");
+	protected boolean isEndComment(final String _line){
+
+		return Optional.ofNullable(_line)
+						.map(String::trim)
+						.map(String::toLowerCase)
+						.map(val -> val.contains("*/"))
+						.orElse(false);
 	}
 	
-	private boolean isMainTypeDefinition(final String _line){
+	protected boolean isMainTypeDefinition(final String _line){
 
-		final String[] javaTypes={"class","interface","@interface","enum"};
-		final String processingLine=_line.trim().toLowerCase();
-		boolean reply=false;
-
-
-		for(String javaType:javaTypes){
-			reply|=(processingLine.startsWith(javaType+" "))||(processingLine.contains(" "+javaType+" "));
-		}
-
-		return reply;
+		return Optional.ofNullable(_line)
+						.map(String::trim)
+						.map(String::toLowerCase)
+						.flatMap(processingLine -> Stream.of("class ","interface ","@interface ","enum ")
+															.filter(type -> (processingLine.startsWith(type))||(processingLine.contains(" "+type)))
+															.map(type -> Boolean.TRUE)
+															.findAny())
+						.orElse(Boolean.FALSE);
 	}
 }
