@@ -8,7 +8,7 @@
 	</parent>
 	<groupId>org.bytemechanics.maven</groupId>
 	<artifactId>copysource-maven-plugin</artifactId>
-	<version>1.2.0</version>
+	<version>1.3.0</version>
 	<packaging>maven-plugin</packaging>
 	<name>Copy sources maven plugin</name>
 	<description>Maven pluguin to copy and repackage sources to reduce library dependencies</description>
