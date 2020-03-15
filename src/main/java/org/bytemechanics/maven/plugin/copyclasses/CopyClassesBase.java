@@ -31,9 +31,9 @@ import java.text.MessageFormat;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.jar.JarEntry;
-import java.util.jar.JarException;
 import java.util.jar.JarFile;
 import java.util.stream.Stream;
+import java.util.zip.ZipException;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
@@ -83,7 +83,7 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 public abstract class CopyClassesBase extends AbstractMojo {
 
 	
-	private static final String METAINF = "META-INF";
+	protected static final String METAINF = "META-INF";
 	
 	/**
 	 * Artifact resolver, needed to download source jars for inclusion in classpath.
@@ -166,56 +166,78 @@ public abstract class CopyClassesBase extends AbstractMojo {
 	
 	protected void generateSources(final Scope _scope) throws MojoExecutionException {
 		
-		Path generatedSourcesPath=null;
-		
 		final ProjectBuildingRequest buildingRequest=new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
-		final Charset sourceEncoding=Charset.forName(this.project.getProperties().getProperty("project.build.sourceEncoding"));
+		final Charset sourceEncoding=Charset.forName(getProject().getProperties().getProperty("project.build.sourceEncoding"));
 		getLog().debug(MessageFormat.format("Source encoding: {0}",sourceEncoding));
+		
+		final Path generatedSourcesPath=generateSourcePath( _scope);
 
-		try{
-			generatedSourcesPath=Paths.get(this.project.getBuild().getDirectory())
-										.resolve(_scope.getFolder())
-										.resolve(this.generatedSourceFolder);
-			Files.createDirectories(generatedSourcesPath.resolve(METAINF));
-			_scope.registerSourceFolder(this.project, generatedSourcesPath);
-			getLog().debug(MessageFormat.format("Generated source folder: {0}",generatedSourcesPath));
-		}catch(IOException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable to create folder {0}",generatedSourcesPath), e);
-		}
-
-		for(CopyDefinition copy:copies){
+		for(CopyDefinition copy:getCopies()){
 			getLog().info(copy.toString());
-			try{
-				Artifact artifact=this.artifactResolver
-											.resolveArtifact(buildingRequest, copy.toCoordinate())
-											.getArtifact();
-				getLog().debug(MessageFormat.format("Found: {0}",artifact));
-				final File file=artifact.getFile();
-				getLog().debug(MessageFormat.format("Downloaded source: {0}",file));
-				processDownloadedSource(file, copy, generatedSourcesPath, sourceEncoding);
-			}catch(MojoExecutionException e){
-				throw e;
-			}catch(Exception e){
-				throw new MojoExecutionException(MessageFormat.format("Failed processing copy: {0}",copy.getArtifact()), e);
-			}
+			processClassesFromCopy(buildingRequest, copy, generatedSourcesPath, sourceEncoding);
 		}
 		
 		getLog().debug("Write copy manifest");
-		try(BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(generatedSourcesPath.resolve(METAINF).resolve("copy-manifest.info"),sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
-			sourceWriter.write("The following classes has been copied from external libraries:\n\n");
-			for(CopyDefinition copy:copies){
-				sourceWriter.write(MessageFormat.format("From artifact [{0}]:\n", copy.getArtifact()));
-				for(String clazz:copy.getClasses()){
-					sourceWriter.write(MessageFormat.format("\t[{0}] repackaged from [{1}]\n", clazz.replace(copy.getFromPackage(),copy.getToPackage()),clazz));
+		createManifest(generatedSourcesPath, sourceEncoding);
+		final Resource resource=new Resource();
+		resource.setDirectory(generatedSourcesPath.resolve(METAINF).toString());
+		resource.setTargetPath(METAINF);
+		getProject().addResource(resource);
+	}
+
+	protected void createManifest(final Path generatedSourcesPath, final Charset sourceEncoding) throws MojoExecutionException {
+	
+		try{
+			final Path metainfFolder=generatedSourcesPath.resolve(METAINF);
+			Files.createDirectories(metainfFolder);
+			try(BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(metainfFolder.resolve("copy-manifest.info"),sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
+				sourceWriter.write("The following classes has been copied from external libraries:\n\n");
+				for(CopyDefinition copy:getCopies()){
+					sourceWriter.write(MessageFormat.format("From artifact [{0}]:\n", copy.getArtifact()));
+					for(String clazz:copy.getClasses()){
+						sourceWriter.write(MessageFormat.format("\t[{0}] repackaged from [{1}]\n", clazz.replace(copy.getFromPackage(),copy.getToPackage()),clazz));
+					}
 				}
 			}
 		}catch(IOException e){
 			throw new MojoExecutionException("Unable create manifest file", e);
 		}
-		final Resource resource=new Resource();
-		resource.setDirectory(generatedSourcesPath.resolve(METAINF).toString());
-		resource.setTargetPath(METAINF);
-		this.project.addResource(resource);
+	}
+
+	@SuppressWarnings("UseSpecificCatch")
+	protected void processClassesFromCopy(final ProjectBuildingRequest _buildingRequest,final CopyDefinition _copy, final Path _generatedSourcesPath, final Charset _sourceEncoding) throws MojoExecutionException {
+		
+		try{
+			final Artifact artifact=getArtifactResolver()
+											.resolveArtifact(_buildingRequest, _copy.toCoordinate())
+											.getArtifact();
+			getLog().debug(MessageFormat.format("Found: {0}",artifact));
+			final File file=artifact.getFile();
+			getLog().debug(MessageFormat.format("Downloaded source: {0}",file));
+			processDownloadedSource(file, _copy, _generatedSourcesPath, _sourceEncoding);
+		}catch(MojoExecutionException e){
+			throw e;
+		}catch(Exception e){
+			throw new MojoExecutionException(MessageFormat.format("Failed processing copy: {0}",_copy.getArtifact()), e);
+		}
+	}
+
+	protected Path generateSourcePath(final Scope _scope) throws MojoExecutionException {
+		
+		Path reply=null;
+		
+		try{
+			reply=Paths.get(getProject().getBuild().getDirectory())
+					.resolve(_scope.getFolder())
+					.resolve(this.getGeneratedSourceFolder());
+			Files.createDirectories(reply);
+			_scope.registerSourceFolder(getProject(), reply);
+			getLog().debug(MessageFormat.format("Generated source folder: {0}",reply));
+		}catch(IOException e){
+			throw new MojoExecutionException(MessageFormat.format("Unable to create folder {0}",reply), e);
+		}
+		
+		return reply;
 	}
 
 	protected void processDownloadedSource(final File _file,final CopyDefinition _copy,final Path _generatedSourcesPath, final Charset _sourceEncoding) throws IOException, MojoExecutionException {
@@ -236,7 +258,7 @@ public abstract class CopyClassesBase extends AbstractMojo {
 					copySource(sourcePackage, sourceEntry, _copy, sourceFile, _sourceEncoding, _file, clazz);
 				}
 			}
-		}catch(JarException|MojoExecutionException e){
+		}catch(ZipException|MojoExecutionException e){
 			throw new MojoExecutionException(MessageFormat.format("Unable to open source {0} from artifact {1}",_file,_copy.getArtifact()), e);
 		}
 	}

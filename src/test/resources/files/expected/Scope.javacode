@@ -14,11 +14,13 @@
  * limitations under the License.
  */
 package org.bytemechanics.maven.plugin.copyclasses.enums;
+import javax.annotation.Generated;
 
 import java.nio.file.Path;
 import org.apache.maven.project.MavenProject;
 
 /**
+ *
  * @author afarre
  */
 @Generated(value="generated-by-copy-plugin", comments = "Copied from org.bytemechanics:copy-commons:jar:sources:1.5.0", date = "2020-03-04T17:11:49.805")

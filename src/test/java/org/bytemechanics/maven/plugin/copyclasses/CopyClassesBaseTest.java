@@ -19,11 +19,15 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
+import java.nio.charset.Charset;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.nio.file.attribute.FileAttribute;
+import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import java.util.Properties;
 import java.util.concurrent.atomic.AtomicBoolean;
@@ -33,19 +37,28 @@ import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
 import java.util.zip.ZipEntry;
+import java.util.zip.ZipException;
 import mockit.Expectations;
 import mockit.Injectable;
 import mockit.Mock;
 import mockit.MockUp;
 import mockit.Mocked;
 import mockit.Tested;
+import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
+import org.apache.maven.model.Build;
+import org.apache.maven.model.Resource;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.MojoFailureException;
 import org.apache.maven.project.MavenProject;
+import org.apache.maven.project.ProjectBuildingRequest;
+import org.apache.maven.shared.transfer.artifact.ArtifactCoordinate;
 import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolver;
+import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolverException;
+import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResult;
 import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
 import org.bytemechanics.maven.plugin.copyclasses.enums.GeneratedFactory;
+import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -216,6 +229,46 @@ public class CopyClassesBaseTest {
 		);
 	}
 	
+	@ParameterizedTest(name = "generateSources() for scope {0}")
+	@EnumSource(Scope.class)
+	public void generateSources(final Scope _scope,final @Mocked ProjectBuildingRequest _request) throws MojoExecutionException{
+		
+		final Properties projectProperties=new Properties();
+		projectProperties.setProperty("project.build.sourceEncoding", "UTF-8");
+		final Path expectedGeneratedFolder=Paths.get("target/tests/generateSources")
+												.resolve(_scope.getFolder())
+												.resolve(this.generatedSourceFolder);
+		final Resource expectedResource=new Resource();
+		expectedResource.setDirectory(expectedGeneratedFolder.resolve(CopyClassesBase.METAINF).toString());
+		expectedResource.setTargetPath(CopyClassesBase.METAINF);
+
+		final List<Resource> actualResource=new ArrayList<>();
+		
+		new Expectations() {{
+			session.getProjectBuildingRequest(); result=_request;
+			instance.getProject(); result=project;
+			project.getProperties(); result=projectProperties;
+			instance.generateSourcePath(_scope); result=expectedGeneratedFolder; times=1;
+			
+			instance.getCopies(); result=new CopyDefinition[]{copy1,copy2}; times=1;
+			
+			copy1.toString(); result="copy1"; times=1;
+			instance.processClassesFromCopy((ProjectBuildingRequest)any, copy1, expectedGeneratedFolder, StandardCharsets.UTF_8); times=1;
+			
+			copy2.toString(); result="copy2"; times=1;
+			instance.processClassesFromCopy((ProjectBuildingRequest)any, copy2, expectedGeneratedFolder, StandardCharsets.UTF_8); times=1;
+			
+			instance.createManifest(expectedGeneratedFolder, StandardCharsets.UTF_8); times=1;
+
+			project.addResource(withCapture(actualResource)); times=1;
+		}};
+
+		instance.generateSources(_scope);
+		
+		Assertions.assertEquals(1,actualResource.size());
+		Assertions.assertEquals(expectedResource.toString(),actualResource.get(0).toString());
+	}
+	
 	@ParameterizedTest(name = "generateSourceFile() for class {0} should create {1}")
 	@MethodSource("generatePackageDataPack")
 	public void generateSourceFile(final String _class,final String _newFile){
@@ -241,6 +294,195 @@ public class CopyClassesBaseTest {
 		Assertions.assertFalse(actual.isPresent());
 	}
 
+	@ParameterizedTest(name = "generateSourcePath() for scope {0}")
+	@EnumSource(Scope.class)
+	public void generateSourcePath(final Scope _scope,final @Mocked ProjectBuildingRequest _request,final @Mocked Build _build) throws MojoExecutionException{
+		
+		
+		final Path expectedGeneratedFolder=Paths.get("target/tests/generateSourcePath")
+												.resolve(_scope.getFolder())
+												.resolve(this.generatedSourceFolder);
+
+		new Expectations() {{
+			project.getBuild(); result=_build;
+			_build.getDirectory(); result="target/tests/generateSourcePath";
+		}};
+
+		Assertions.assertEquals(expectedGeneratedFolder,instance.generateSourcePath(_scope));
+		Assertions.assertTrue(Files.exists(expectedGeneratedFolder));
+		Assertions.assertTrue(Files.isDirectory(expectedGeneratedFolder));
+	}
+	@ParameterizedTest(name = "generateSourcePath() for scope {0} should raise MojoExecutionException when can not create folders")
+	@EnumSource(Scope.class)
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void generateSourcePath_failure(final Scope _scope,final @Mocked ProjectBuildingRequest _request,final @Mocked Build _build) throws MojoExecutionException{
+		
+		
+		new Expectations() {{
+			project.getBuild(); result=new IOException("Unable to create folders");
+		}};
+
+		Assertions.assertThrows(MojoExecutionException.class,() -> instance.generateSourcePath(_scope));
+	}
+
+	@Test
+	@DisplayName("processClassesFromCopy() success execution")
+	public void processClassesFromCopy(final @Mocked ProjectBuildingRequest _request,final @Mocked CopyDefinition _copy, final @Mocked ArtifactCoordinate _artifactCoordinate,final @Mocked ArtifactResult _artifactResult,final @Mocked Artifact _artifact) throws ArtifactResolverException, IOException, MojoExecutionException{
+		
+		
+		final Path generatedFolder=Paths.get("target/tests/processClassesFromCopy");
+		final File fileCopy=new File("myFileFromCopy");
+
+		new Expectations() {{
+			_copy.toCoordinate(); result=_artifactCoordinate; times=1;
+			artifactResolver.resolveArtifact(_request, _artifactCoordinate); result=_artifactResult; times=1;
+			_artifactResult.getArtifact(); result=_artifact; times=1;
+			_artifact.toString(); result="copy:artifact";
+			_artifact.getFile(); result=fileCopy; times=1;
+			instance.processDownloadedSource(fileCopy, _copy, generatedFolder, StandardCharsets.UTF_8); times=1;
+		}};
+
+		instance.processClassesFromCopy(_request, _copy, generatedFolder, StandardCharsets.UTF_8);
+	}
+	@Test
+	@DisplayName("processClassesFromCopy() processing failure should resend MojoExecutionException")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void processClassesFromCopy_processing_failure(final @Mocked ProjectBuildingRequest _request,final @Mocked CopyDefinition _copy, final @Mocked ArtifactCoordinate _artifactCoordinate,final @Mocked ArtifactResult _artifactResult,final @Mocked Artifact _artifact) throws ArtifactResolverException, IOException, MojoExecutionException{
+		
+		
+		final Path generatedFolder=Paths.get("target/tests/processClassesFromCopy_processing_failure");
+		final File fileCopy=new File("myFileFromCopy");
+		final MojoExecutionException exception=new MojoExecutionException("myFailure");
+
+		new Expectations() {{
+			_copy.toCoordinate(); result=_artifactCoordinate; times=1;
+			artifactResolver.resolveArtifact(_request, _artifactCoordinate); result=_artifactResult; times=1;
+			_artifactResult.getArtifact(); result=_artifact; times=1;
+			_artifact.toString(); result="copy:artifact";
+			_artifact.getFile(); result=fileCopy; times=1;
+			instance.processDownloadedSource(fileCopy, _copy, generatedFolder, StandardCharsets.UTF_8); result=exception; times=1;
+		}};
+
+		Assertions.assertThrows(MojoExecutionException.class, () -> instance.processClassesFromCopy(_request, _copy, generatedFolder, StandardCharsets.UTF_8)
+								,"myFailure") ;
+	}
+	@Test
+	@DisplayName("processClassesFromCopy() unexpected failure should raise MojoExecutionException")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void processClassesFromCopy_unexpected_failure(final @Mocked ProjectBuildingRequest _request,final @Mocked CopyDefinition _copy, final @Mocked ArtifactCoordinate _artifactCoordinate,final @Mocked ArtifactResult _artifactResult,final @Mocked Artifact _artifact) throws ArtifactResolverException, IOException, MojoExecutionException{
+		
+		
+		final Path generatedFolder=Paths.get("target/tests/processClassesFromCopy_unexpected_failure");
+
+		new Expectations() {{
+			_copy.toCoordinate(); result=_artifactCoordinate; times=1;
+			artifactResolver.resolveArtifact(_request, _artifactCoordinate); result=_artifactResult; times=1;
+			_artifactResult.getArtifact(); result=new NullPointerException(); times=1;
+		}};
+
+		MojoExecutionException exception=Assertions.assertThrows(MojoExecutionException.class, () -> instance.processClassesFromCopy(_request, _copy, generatedFolder, StandardCharsets.UTF_8));
+		Assertions.assertTrue(exception.getCause() instanceof NullPointerException);
+	}
+	
+	@Test
+	@DisplayName("createManifest() success execution")
+	public void createManifest() throws MojoExecutionException, IOException{
+		
+		final Path generatedFolder=Paths.get("target/tests/createManifest");
+		Files.createDirectories(generatedFolder);
+		final Path actualManifestPath=generatedFolder.resolve(CopyClassesBase.METAINF).resolve("copy-manifest.info");
+		final String expected="The following classes has been copied from external libraries:\n" +
+								"\n" +
+								"From artifact [myFirstArtifact]:\n" +
+								"	[first.destiny.package.class1] repackaged from [my.first.original.package.class1]\n" +
+								"	[first.destiny.package.class2] repackaged from [my.first.original.package.class2]\n" +
+								"	[first.destiny.package.class3] repackaged from [my.first.original.package.class3]\n" +
+								"From artifact [mySecondArtifact]:\n" +
+								"	[second.destiny.package.class1] repackaged from [my.second.original.package.class1]\n" +
+								"	[second.destiny.package.class2] repackaged from [my.second.original.package.class2]\n" +
+								"	[second.destiny.package.class3] repackaged from [my.second.original.package.class3]\n";
+
+		new Expectations() {{
+			copy1.getArtifact(); result="myFirstArtifact"; times=1;
+			copy1.getClasses(); result=new String[]{"my.first.original.package.class1","my.first.original.package.class2","my.first.original.package.class3"}; times=1;
+			copy1.getFromPackage(); result="my.first.original.package"; times=3;
+			copy1.getToPackage(); result="first.destiny.package"; times=3;
+			copy2.getArtifact(); result="mySecondArtifact"; times=1;
+			copy2.getClasses(); result=new String[]{"my.second.original.package.class1","my.second.original.package.class2","my.second.original.package.class3"}; times=1;
+			copy2.getFromPackage(); result="my.second.original.package"; times=3;
+			copy2.getToPackage(); result="second.destiny.package"; times=3;
+		}};
+
+		instance.createManifest(generatedFolder,StandardCharsets.UTF_8);
+		String actual=new String(Files.readAllBytes(actualManifestPath),StandardCharsets.UTF_8);
+		Assertions.assertEquals(expected, actual);
+	}
+	@Test
+	@DisplayName("createManifest() unable to write should raise MojoExecutionException")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void createManifest_unabletoWrite() throws IOException, MojoExecutionException{
+		
+		final Path generatedFolder=Paths.get("target/tests/createManifest_unabletoWrite");
+		new Expectations() {{
+			copy1.getArtifact(); result=new IOException("exception");
+		}};
+
+		Assertions.assertThrows(MojoExecutionException.class,() -> instance.createManifest(generatedFolder,StandardCharsets.UTF_8),"Unable create manifest file");
+	}
+	
+	@Test
+	@DisplayName("processDownloadedSource() for should return MojoExecutionException if zip failure happens")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void processDownloadedSource_jar_failure(final @Mocked CopyDefinition _copy) throws IOException, MojoExecutionException{
+	
+		final File file=Paths.get("src/test/resources/files/original/LambdaUnchecker.javacode").toFile();
+		final Path generatedSourcesPath=Paths.get("target/tests/processDownloadedSource_zip_failure"); 
+		final Charset sourceEncoding=StandardCharsets.UTF_8;
+
+		MojoExecutionException exception=Assertions.assertThrows(MojoExecutionException.class,() -> instance.processDownloadedSource(file, _copy, generatedSourcesPath, sourceEncoding));
+		Assertions.assertTrue(exception.getCause() instanceof ZipException);
+	}
+	@Test
+	@DisplayName("processDownloadedSource() for should return MojoExecutionException if copy failure happens")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void processDownloadedSource_copy_failure(final @Mocked CopyDefinition _copy) throws IOException, MojoExecutionException{
+	
+		final File file=Paths.get("src/test/resources/files/fakeJar.jar").toFile();
+		final Path generatedSourcesPath=Paths.get("target/tests/processDownloadedSource_copy_failure"); 
+		final Charset sourceEncoding=StandardCharsets.UTF_8;
+
+		new Expectations() {{
+			_copy.getClasses(); result=new String[]{"com.notfound.generate.failure"};
+		}};
+		MojoExecutionException exception=Assertions.assertThrows(MojoExecutionException.class,() -> instance.processDownloadedSource(file, _copy, generatedSourcesPath, sourceEncoding));
+		Assertions.assertTrue(exception.getCause() instanceof MojoExecutionException);
+	}	
+	@Test
+	@DisplayName("processDownloadedSource() for should return MojoExecutionException if copy failure happens")
+	@SuppressWarnings("ThrowableResultIgnored")
+	public void processDownloadedSource(final @Mocked CopyDefinition _copy) throws IOException, MojoExecutionException{
+	
+		final File file=Paths.get("src/test/resources/files/fakeJar.jar").toFile();
+		final Path generatedSourcesPath=Paths.get("target/tests/processDownloadedSource"); 
+		final Path generatedSourcesQueuePath=generatedSourcesPath.resolve("FastDropLastQueue.java"); 
+		final Path generatedSourcesArrayPath=generatedSourcesPath.resolve("ArrayUtils.java"); 
+		final Path generatedSourcesFigletPath=generatedSourcesPath.resolve("Figlet.java"); 
+		final Charset sourceEncoding=StandardCharsets.UTF_8;
+
+		new Expectations() {{
+			_copy.getClasses(); result=new String[]{"org.bytemechanics.commons.collections.FastDropLastQueue","org.bytemechanics.commons.lang.ArrayUtils","org.bytemechanics.commons.string.Figlet"};
+			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.collections.FastDropLastQueue", _copy); result=Optional.of(generatedSourcesQueuePath); times=1;
+			instance.generatePackage(generatedSourcesQueuePath); times=1;
+			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesQueuePath,sourceEncoding,file,"org.bytemechanics.commons.collections.FastDropLastQueue"); times=1;
+			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.lang.ArrayUtils", _copy); result=Optional.of(generatedSourcesArrayPath); times=1;
+			instance.generatePackage(generatedSourcesArrayPath); times=1;
+			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesArrayPath,sourceEncoding,file,"org.bytemechanics.commons.lang.ArrayUtils"); times=1;
+			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.string.Figlet", _copy); result=Optional.of(generatedSourcesFigletPath); times=1;
+			instance.generatePackage(generatedSourcesFigletPath); times=1;
+			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesFigletPath,sourceEncoding,file,"org.bytemechanics.commons.string.Figlet"); times=1;
+		}};
+		instance.processDownloadedSource(file, _copy, generatedSourcesPath, sourceEncoding);
+	}		
 	
 	@Test
 	@DisplayName("generatePackage() for should generate the folders")
@@ -299,16 +541,104 @@ public class CopyClassesBaseTest {
 	}
 	@ParameterizedTest(name = "copySource() for file {0} should generate a file with @Generated annotation with the package changed at {1}")
 	@MethodSource("copySourceDataPack")
-	@SuppressWarnings("CallToPrintStackTrace")
-	public void copySource(final String _clazz,final String _target) throws MojoExecutionException, IOException {
+	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
+	public void copySource(final String _clazz,final String _target,final @Mocked GeneratedFactory _generatedfactory) throws MojoExecutionException, IOException {
 		
 		final Path originalFolder=Paths.get("src/test/resources/files/original");
 		final Path expectedFolder=Paths.get("src/test/resources/files/expected");
 		final Path generatedFolder=Paths.get("target/tests/copySource");
-		final Path originalSourceFile=originalFolder.resolve(_target);
-		final Path expectedSourceFile=expectedFolder.resolve(_target);
+		final String fileName=Paths.get(_target).getFileName().toString()+"code";
+		final Path originalSourceFile=originalFolder.resolve(fileName);
+		final Path expectedSourceFile=expectedFolder.resolve(fileName);
 		final Path generatedSourceFile=generatedFolder.resolve(_target);
-		Files.createDirectories(generatedSourceFile);
+		Files.createDirectories(generatedSourceFile.getParent());
+		
+		
+		class JarFileMock extends JarFile{
+
+			public JarFileMock(final File _file) throws IOException {
+				super(_file);
+			}
+
+			@Override
+			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
+				return Files.newInputStream(originalSourceFile);
+			}
+		}
+		
+		new Expectations() {{
+			instance.getGeneratedFactory(); result=_generatedfactory;
+			_generatedfactory.getAnnotation(copy1,(LocalDateTime) any); result="@Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from org.bytemechanics:copy-commons:jar:sources:1.5.0\", date = \"2020-03-04T17:11:49.805\")\n";
+			_generatedfactory.getImport(); result="import javax.annotation.Generated;\n";
+			copy1.getFromPackageRegex(); result="org\\.bytemechanics\\.commons\\.functional";
+			copy1.getToPackage(); result="com.mypackage2.matched.true";
+			copy1.getSourceCharset(); result="UTF-8";
+		}};
+		
+		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
+		final File file=fakejar.toFile();
+		try(JarFileMock jarFile=new JarFileMock(file)){
+			instance.copySource(jarFile, new JarEntry("none"), copy1, generatedSourceFile, StandardCharsets.UTF_8, originalSourceFile.toFile(), _clazz);
+			Assertions.assertEquals(Files.readAllLines(expectedSourceFile,StandardCharsets.UTF_8),Files.readAllLines(generatedSourceFile,StandardCharsets.UTF_8));
+		}catch(Exception e){
+			e.printStackTrace();
+			Assertions.fail("Should not raise an exception here",e);
+		}
+	}
+	@Test
+	@DisplayName("copySource() with non readable source file should raise MojoExecutionException")
+	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
+	public void copySource_read_failure() throws MojoExecutionException, IOException {
+		
+		final String clazz="org.bytemechanics.commons.functional.LambdaUnchecker";
+		final String target="com/mypackage2/matched/true/LambdaUnchecker.java";
+		final Path originalFolder=Paths.get("src/test/resources/files/original");
+		final Path generatedFolder=Paths.get("target/tests/copySource_read_failure");
+		final String fileName=Paths.get(target).getFileName().toString()+"code";
+		final Path originalSourceFile=originalFolder.resolve(fileName);
+		final Path generatedSourceFile=generatedFolder.resolve(target);
+		Files.createDirectories(generatedSourceFile.getParent());
+		
+		
+		class JarFileMock extends JarFile{
+
+			public JarFileMock(final File _file) throws IOException {
+				super(_file);
+			}
+
+			@Override
+			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
+				throw new IOException("input not readable");
+			}
+		}
+		
+		new Expectations() {{
+			project.getProperties(); result=new Properties();
+			copy1.getSourceCharset(); result="UTF-8";
+		}};
+		
+		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
+		final File file=fakejar.toFile();
+		try(JarFileMock jarFile=new JarFileMock(file)){
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), copy1, generatedSourceFile, StandardCharsets.UTF_8, originalSourceFile.toFile(), clazz));
+		}catch(Exception e){
+			e.printStackTrace();
+			Assertions.fail("Should not raise an exception here",e);
+		}
+	}
+	@Test
+	@DisplayName("copySource() with non valid charset should raise MojoExecutionException")
+	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
+	public void copySource_charset_failure() throws MojoExecutionException, IOException {
+		
+		final String clazz="org.bytemechanics.commons.functional.LambdaUnchecker";
+		final String target="com/mypackage2/matched/true/LambdaUnchecker.java";
+		final Path originalFolder=Paths.get("src/test/resources/files/original");
+		final Path generatedFolder=Paths.get("target/tests/copySource_charset_failure");
+		final String fileName=Paths.get(target).getFileName().toString()+"code";
+		final Path originalSourceFile=originalFolder.resolve(fileName);
+		final Path generatedSourceFile=generatedFolder.resolve(target);
+		Files.createDirectories(generatedSourceFile.getParent());
 		
 		
 		class JarFileMock extends JarFile{
@@ -325,16 +655,57 @@ public class CopyClassesBaseTest {
 		
 		new Expectations() {{
 			project.getProperties(); result=new Properties();
-			copy1.getSourceCharset(); result="UTF-8";
+			copy1.getSourceCharset(); result="my-failure-charset";
 		}};
 		
 		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
 		final File file=fakejar.toFile();
 		try(JarFileMock jarFile=new JarFileMock(file)){
-			instance.copySource(jarFile, new JarEntry("none"), copy1, generatedSourceFile, StandardCharsets.UTF_8, originalSourceFile.toFile(), _clazz);
-			Assertions.assertEquals(Files.readAllLines(expectedSourceFile,StandardCharsets.UTF_8),Files.readAllLines(generatedSourceFile,StandardCharsets.UTF_8));
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), copy1, generatedSourceFile, StandardCharsets.UTF_8, originalSourceFile.toFile(), clazz));
 		}catch(Exception e){
 			e.printStackTrace();
+			Assertions.fail("Should not raise an exception here",e);
+		}
+	}	
+	@Test
+	@DisplayName("copySource() with unsuported charset should raise MojoExecutionException")
+	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
+	public void copySource_charset_unsuported_failure() throws MojoExecutionException, IOException {
+		
+		final String clazz="org.bytemechanics.commons.functional.LambdaUnchecker";
+		final String target="com/mypackage2/matched/true/LambdaUnchecker.java";
+		final Path originalFolder=Paths.get("src/test/resources/files/original");
+		final Path generatedFolder=Paths.get("target/tests/copySource_charset_unsuported_failure");
+		final String fileName=Paths.get(target).getFileName().toString()+"code";
+		final Path originalSourceFile=originalFolder.resolve(fileName);
+		final Path generatedSourceFile=generatedFolder.resolve(target);
+		Files.createDirectories(generatedSourceFile.getParent());
+		
+		
+		class JarFileMock extends JarFile{
+
+			public JarFileMock(final File _file) throws IOException {
+				super(_file);
+			}
+
+			@Override
+			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
+				return Files.newInputStream(originalSourceFile);
+			}
+		}
+		
+		new Expectations() {{
+			project.getProperties(); result=new Properties();
+			copy1.getSourceCharset(); result="UTF-128";
+		}};
+		
+		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
+		final File file=fakejar.toFile();
+		try(JarFileMock jarFile=new JarFileMock(file)){
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), copy1, generatedSourceFile, StandardCharsets.UTF_8, originalSourceFile.toFile(), clazz));
+		}catch(Exception e){
+			e.printStackTrace();
+			Assertions.fail("Should not raise an exception here",e);
 		}
 	}
 	

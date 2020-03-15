@@ -13,7 +13,8 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.bytemechanics.commons.functional;
+package com.mypackage2.matched.true;
+import javax.annotation.Generated;
 
 import java.util.function.BiConsumer;
 import java.util.function.Consumer;
