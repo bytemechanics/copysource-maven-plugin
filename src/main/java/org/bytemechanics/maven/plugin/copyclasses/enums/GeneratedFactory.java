@@ -30,29 +30,32 @@ public enum GeneratedFactory {
 	JDK5("1.5"){
 		@Override
 		public String getImport(){
-			return "import javax.annotation.Generated;\n";
+			return IMPORT_JAVAX_ANNOTATION;
 		}
 	},
 	JDK6("1.6"){
 		@Override
 		public String getImport(){
-			return "import javax.annotation.Generated;\n";
+			return IMPORT_JAVAX_ANNOTATION;
 		}
 	},
 	JDK7("1.7"){
 		@Override
 		public String getImport(){
-			return "import javax.annotation.Generated;\n";
+			return IMPORT_JAVAX_ANNOTATION;
 		}
 	},
 	JDK8("1.8"){
 		@Override
 		public String getImport(){
-			return "import javax.annotation.Generated;\n";
+			return IMPORT_JAVAX_ANNOTATION;
 		}
 	},
 	JDK9("1.9");
 	
+	public static final String IMPORT_JAVAX_ANNOTATION="import javax.annotation.Generated;\n";
+	public static final String IMPORT_JAVAX_PROCESSING_ANNOTATION="import javax.annotation.processing.Generated;\n";
+	public static final String JAVAX_ANNOTATION_PATTERN="@Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from {0}:{1}:{2}:{3}\", date = \"{4}\")\n";
 	public final String version; 
 	
 	GeneratedFactory(final String _version){
@@ -60,13 +63,13 @@ public enum GeneratedFactory {
 	}
 	
 	public String getImport(){
-		return "import javax.annotation.processing.Generated;\n";
+		return IMPORT_JAVAX_PROCESSING_ANNOTATION;
 	}
 	public String getAnnotation(final CopyDefinition _copy,final LocalDateTime _time){
 		return Optional.ofNullable(_copy)
 						.map(CopyDefinition::toCoordinate)
 						.map(coordinate -> new Object[]{coordinate.getGroupId(),coordinate.getArtifactId(),coordinate.getVersion(),coordinate.getClassifier(),_time})
-						.map(values -> MessageFormat.format("@Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from {0}:{1}:{2}:{3}\", date = \"{4}\")\n", values))
+						.map(values -> MessageFormat.format(JAVAX_ANNOTATION_PATTERN, values))
 						.orElseThrow(() -> new UnableToIdentifyCoordinate(_copy));
 	}
 	
