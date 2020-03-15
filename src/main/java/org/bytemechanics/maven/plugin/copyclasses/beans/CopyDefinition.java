@@ -15,11 +15,10 @@
  */
 package org.bytemechanics.maven.plugin.copyclasses.beans;
 
-import lombok.AllArgsConstructor;
-import lombok.Data;
-import lombok.NoArgsConstructor;
-import org.apache.maven.shared.artifact.ArtifactCoordinate;
-import org.apache.maven.shared.artifact.DefaultArtifactCoordinate;
+import java.util.Arrays;
+import java.util.Objects;
+import org.apache.maven.shared.transfer.artifact.ArtifactCoordinate;
+import org.apache.maven.shared.transfer.artifact.DefaultArtifactCoordinate;
 
 /**
  * Describes the copy to do
@@ -37,9 +36,6 @@ import org.apache.maven.shared.artifact.DefaultArtifactCoordinate;
  *	&lt;/copies&gt;
  * @author afarre
  */
-@Data
-@AllArgsConstructor
-@NoArgsConstructor
 public class CopyDefinition{
 	
 	private String artifact;
@@ -47,23 +43,70 @@ public class CopyDefinition{
 	private String sourceCharset="UTF-8";
 	private String fromPackage;
 	private String toPackage;
-		
+
+
+	public CopyDefinition() {
+	}
+	public CopyDefinition(final String _artifact, final String[] _classes, final String _sourceCharset, final String _fromPackage, final String _toPackage) {
+		this.artifact = _artifact;
+		this.classes = _classes;
+		this.sourceCharset = _sourceCharset;
+		this.fromPackage = _fromPackage;
+		this.toPackage = _toPackage;
+	}
+
+	
+	public String getArtifact() {
+		return artifact;
+	}
+	public void setArtifact(String artifact) {
+		this.artifact = artifact;
+	}
+
+	public String[] getClasses() {
+		return classes;
+	}
+	public void setClasses(String[] classes) {
+		this.classes = classes;
+	}
+
+	public String getSourceCharset() {
+		return sourceCharset;
+	}
+	public void setSourceCharset(String sourceCharset) {
+		this.sourceCharset = sourceCharset;
+	}
+
+	public String getFromPackage() {
+		return fromPackage;
+	}
+	public String getFromPackageRegex(){
+		return getFromPackage().replaceAll("\\.", "\\\\.");
+	}
+	public void setFromPackage(String fromPackage) {
+		this.fromPackage = fromPackage;
+	}
+
+	public String getToPackage() {
+		return toPackage;
+	}
+	public void setToPackage(String toPackage) {
+		this.toPackage = toPackage;
+	}
+	
 	public ArtifactCoordinate toCoordinate(){
 		
-		DefaultArtifactCoordinate reply = new DefaultArtifactCoordinate();
+		final DefaultArtifactCoordinate reply = new DefaultArtifactCoordinate();
 
         if(artifact!=null && !artifact.isEmpty()){
 			final String[] tokens = artifact.split( ":", -1 );
-			reply.setGroupId( ( tokens.length > 0 ) ? tokens[0] : "");
+			reply.setGroupId(( tokens.length > 0 ) ? tokens[0] : "");
 			reply.setArtifactId(( tokens.length > 1 ) ? tokens[1] : "*");
 			reply.setVersion(( tokens.length > 2 ) ? tokens[2] : "*");
-			reply.setClassifier( "sources" );
+			reply.setClassifier(( tokens.length > 3 ) ? tokens[3] : "sources");
         }
 		
 		return reply;
-	}
-	public String toRegexPackage(){
-		return this.fromPackage.replaceAll("\\.", "\\.");
 	}
 	
 	@Override
@@ -81,5 +124,44 @@ public class CopyDefinition{
 		reply.append("\tTransforming from package [").append(this.fromPackage).append("] to package [").append(this.toPackage).append(']');
 		
 		return reply.toString();
+	}
+
+
+	@Override
+	public int hashCode() {
+		int hash = 3;
+		hash = 41 * hash + Objects.hashCode(this.artifact);
+		hash = 41 * hash + Arrays.deepHashCode(this.classes);
+		hash = 41 * hash + Objects.hashCode(this.sourceCharset);
+		hash = 41 * hash + Objects.hashCode(this.fromPackage);
+		hash = 41 * hash + Objects.hashCode(this.toPackage);
+		return hash;
+	}
+
+	@Override
+	public boolean equals(Object obj) {
+		if (this == obj) {
+			return true;
+		}
+		if (obj == null) {
+			return false;
+		}
+		if (getClass() != obj.getClass()) {
+			return false;
+		}
+		final CopyDefinition other = (CopyDefinition) obj;
+		if (!Objects.equals(this.artifact, other.artifact)) {
+			return false;
+		}
+		if (!Objects.equals(this.sourceCharset, other.sourceCharset)) {
+			return false;
+		}
+		if (!Objects.equals(this.fromPackage, other.fromPackage)) {
+			return false;
+		}
+		if (!Objects.equals(this.toPackage, other.toPackage)) {
+			return false;
+		}
+		return Arrays.deepEquals(this.classes, other.classes);
 	}
 }

@@ -20,7 +20,7 @@ import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugins.annotations.LifecyclePhase;
 import org.apache.maven.plugins.annotations.Mojo;
 import org.apache.maven.project.MavenProject;
-import org.apache.maven.shared.artifact.resolve.ArtifactResolver;
+import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolver;
 import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
 import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 
@@ -60,6 +60,7 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 public class CopyTestClassesMojo extends CopyClassesBase {
 
 	public CopyTestClassesMojo() {
+		super();
 	}
 	public CopyTestClassesMojo(ArtifactResolver artifactResolver, MavenSession session, MavenProject project, CopyDefinition[] copies, String generatedSourceFolder) {
 		super(artifactResolver, session, project, copies, generatedSourceFolder);

@@ -1,3 +1,6 @@
 org.bytemechanics.maven.plugin.copyclasses
 org.bytemechanics.maven.plugin.copyclasses.beans
 org.bytemechanics.maven.plugin.copyclasses.enums
+org.bytemechanics.maven.plugin.copyclasses.exceptions
+org.bytemechanics.maven.plugin.copyclasses.internal.commons.functional
+org.bytemechanics.maven.plugin.copyclasses.services

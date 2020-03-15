@@ -32,4 +32,25 @@
                 <sonar.login>219ee1739efe09bba41c7ffbea4094014b0c149d</sonar.login>
             </properties>
         </action>
+        <action>
+            <actionName>test</actionName>
+            <packagings>
+                <packaging>*</packaging>
+            </packagings>
+            <goals>
+                <goal>test</goal>
+            </goals>
+            <properties>
+                <test>${packageClassName}</test>
+                <forkMode>once</forkMode>
+                <maven.surefire.debug>-agentlib:jdwp=transport=dt_socket,server=n,address=${jpda.address}</maven.surefire.debug>
+                
+                
+                <jpda.listen>true</jpda.listen>
+            </properties>
+        </action>
+        
+        
+        
+        
     </actions>

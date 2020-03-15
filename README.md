@@ -13,6 +13,11 @@ To keep the dependency hell away from your projects its important to reduce at m
 the solution comes by copying the source code and repackaging in order to avoid collisions. But this is only necessary when you need ONLY some specific classes, if you need the full library then you should add
 it as dependency.
 
+## Goals
+Available goals:
+* copy-classes: Copy classes to generated-sources
+* copy-test-classes: Copy classes to generated-test-sources
+
 ## Quick start
 _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries, for final projects if you want to build a uber-jar maven already has it's shade plugin that works perfectly**_
 1. Add the pluguin to your pom
