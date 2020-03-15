@@ -59,6 +59,7 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 public class CopyClassesMojo extends CopyClassesBase {
 
 	public CopyClassesMojo() {
+		super();
 	}
 	public CopyClassesMojo(ArtifactResolver artifactResolver, MavenSession session, MavenProject project, CopyDefinition[] copies, String generatedSourceFolder) {
 		super(artifactResolver, session, project, copies, generatedSourceFolder);

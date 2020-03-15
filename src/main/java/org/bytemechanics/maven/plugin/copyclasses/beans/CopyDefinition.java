@@ -80,6 +80,9 @@ public class CopyDefinition{
 	public String getFromPackage() {
 		return fromPackage;
 	}
+	public String getFromPackageRegex(){
+		return getFromPackage().replaceAll("\\.", "\\\\.");
+	}
 	public void setFromPackage(String fromPackage) {
 		this.fromPackage = fromPackage;
 	}
@@ -104,9 +107,6 @@ public class CopyDefinition{
         }
 		
 		return reply;
-	}
-	public String toRegexPackage(){
-		return this.fromPackage.replaceAll("\\.", "\\.");
 	}
 	
 	@Override
