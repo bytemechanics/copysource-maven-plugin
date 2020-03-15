@@ -15,23 +15,10 @@
  */
 package org.bytemechanics.maven.plugin.copyclasses;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.File;
-import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.Charset;
-import java.nio.charset.IllegalCharsetNameException;
-import java.nio.charset.UnsupportedCharsetException;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
-import java.nio.file.StandardOpenOption;
 import java.text.MessageFormat;
-import java.time.LocalDateTime;
-import java.util.jar.JarEntry;
-import java.util.jar.JarException;
-import java.util.jar.JarFile;
 import org.apache.maven.artifact.Artifact;
 import org.apache.maven.execution.MavenSession;
 import org.apache.maven.model.Resource;
@@ -44,8 +31,9 @@ import org.apache.maven.project.MavenProject;
 import org.apache.maven.project.ProjectBuildingRequest;
 import org.apache.maven.shared.transfer.artifact.resolve.ArtifactResolver;
 import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
-import org.bytemechanics.maven.plugin.copyclasses.enums.GeneratedFactory;
 import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
+import org.bytemechanics.maven.plugin.copyclasses.services.CopyService;
+import org.bytemechanics.maven.plugin.copyclasses.services.CopyServiceImpl;
 
 /**
  * @author afarre
@@ -81,7 +69,7 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
 public abstract class CopyClassesBase extends AbstractMojo {
 
 	
-	private static final String METAINF = "META-INF";
+	protected static final String METAINF = "META-INF";
 	
 	/**
 	 * Artifact resolver, needed to download source jars for inclusion in classpath.
@@ -111,10 +99,8 @@ public abstract class CopyClassesBase extends AbstractMojo {
 	@Parameter(defaultValue = "copies", required = true)
 	protected String generatedSourceFolder;
 	
-	private final LocalDateTime executionTime;
-
 	public CopyClassesBase() {
-		this.executionTime=LocalDateTime.now();
+		super();
 	}
 	public CopyClassesBase(final ArtifactResolver _artifactResolver, final MavenSession _session, final MavenProject _project, final CopyDefinition[] _copies, final String _generatedSourceFolder) {
 		this();
@@ -161,169 +147,68 @@ public abstract class CopyClassesBase extends AbstractMojo {
 		this.generatedSourceFolder = generatedSourceFolder;
 	}
 
+	protected CopyService instantiateCopyService(){
+
+		final String javaVersion=getProject()
+									.getProperties()
+										.getProperty("maven.compiler.target","1.8");
+		getLog().debug(MessageFormat.format("Java version: {0}",javaVersion));
+		final String encoding=getProject()
+									.getProperties()
+										.getProperty("project.build.sourceEncoding",Charset.defaultCharset().name());
+		getLog().debug(MessageFormat.format("Source encoding: {0}",encoding));
+		final String targetFolder=getProject()
+									.getBuild()
+										.getDirectory();
+		getLog().debug(MessageFormat.format("Target folder: {0}",targetFolder));
+		return new CopyServiceImpl(getLog(),javaVersion,targetFolder,getGeneratedSourceFolder(),Charset.forName(encoding));
+	}
 	
 	protected void generateSources(final Scope _scope) throws MojoExecutionException {
 		
-		Path generatedSourcesPath=null;
-		
 		final ProjectBuildingRequest buildingRequest=new DefaultProjectBuildingRequest( session.getProjectBuildingRequest() );
-		final Charset sourceEncoding=Charset.forName(this.project.getProperties().getProperty("project.build.sourceEncoding"));
-		getLog().debug(MessageFormat.format("Source encoding: {0}",sourceEncoding));
+		final CopyService copyService=instantiateCopyService();
+		
+		getLog().debug("Generate source destiny path");
+		final Path generatedSourcesPath=copyService.generateSourcePath(_scope);
+		_scope.registerSourceFolder(getProject(), generatedSourcesPath);
+		getLog().debug(MessageFormat.format("Generate source destiny path >> {0}",generatedSourcesPath));
 
-		try{
-			generatedSourcesPath=Paths.get(this.project.getBuild().getDirectory())
-										.resolve(_scope.getFolder())
-										.resolve(this.generatedSourceFolder);
-			Files.createDirectories(generatedSourcesPath.resolve(METAINF));
-			_scope.registerSourceFolder(this.project, generatedSourcesPath);
-			getLog().debug(MessageFormat.format("Generated source folder: {0}",generatedSourcesPath));
-		}catch(IOException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable to create folder {0}",generatedSourcesPath), e);
-		}
-
-		for(CopyDefinition copy:copies){
-			getLog().info(copy.toString());
-			try{
-				Artifact artifact=this.artifactResolver
-											.resolveArtifact(buildingRequest, copy.toCoordinate())
-											.getArtifact();
-				getLog().debug(MessageFormat.format("Found: {0}",artifact));
-				final File file=artifact.getFile();
-				getLog().debug(MessageFormat.format("Downloaded source: {0}",file));
-				processDownloadedSource(file, copy, generatedSourcesPath, sourceEncoding);
-			}catch(MojoExecutionException e){
-				throw e;
-			}catch(Exception e){
-				throw new MojoExecutionException(MessageFormat.format("Failed processing copy: {0}",copy.getArtifact()), e);
-			}
+		getLog().debug("Process copies");
+		for(CopyDefinition copy:getCopies()){
+			getLog().info(MessageFormat.format("Process copy: {0}",copy));
+			final Path downloadedFile=downloadSource(buildingRequest, copy, generatedSourcesPath);
+			getLog().debug(MessageFormat.format("Process copy {0} >> Downloaded source: {1}",copy,downloadedFile));
+			copyService.processDownloadedSource(downloadedFile, copy, generatedSourcesPath);
+			getLog().debug(MessageFormat.format("Process copy {0} >> Downloaded source: {1} >> processed",copy,downloadedFile));
 		}
 		
 		getLog().debug("Write copy manifest");
-		try(BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(generatedSourcesPath.resolve(METAINF).resolve("copy-manifest.info"),sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
-			sourceWriter.write("The following classes has been copied from external libraries:\n\n");
-			for(CopyDefinition copy:copies){
-				sourceWriter.write(MessageFormat.format("From artifact [{0}]:\n", copy.getArtifact()));
-				for(String clazz:copy.getClasses()){
-					sourceWriter.write(MessageFormat.format("\t[{0}] repackaged from [{1}]\n", clazz.replace(copy.getFromPackage(),copy.getToPackage()),clazz));
-				}
-			}
-		}catch(IOException e){
-			throw new MojoExecutionException("Unable create manifest file", e);
-		}
+		copyService.createManifest(getCopies(),generatedSourcesPath);
+		
+		getLog().debug("Register manifest resource");
 		final Resource resource=new Resource();
 		resource.setDirectory(generatedSourcesPath.resolve(METAINF).toString());
 		resource.setTargetPath(METAINF);
-		this.project.addResource(resource);
+		getProject().addResource(resource);
 	}
 
-	private void processDownloadedSource(final File _file,final CopyDefinition _copy,final Path _generatedSourcesPath, final Charset _sourceEncoding) throws IOException, MojoExecutionException {
-		
-		try(JarFile sourcePackage=new JarFile(_file,true,JarFile.OPEN_READ)){
-			for(String clazz:_copy.getClasses()){
-				getLog().debug(MessageFormat.format("Looking for class {0}",clazz));
-				final JarEntry sourceEntry=sourcePackage.getJarEntry(clazz.replace('.','/')+".java");
-				if(sourceEntry==null){
-					throw new MojoExecutionException(MessageFormat.format("Unable find class {0} at source {1} from artifact {2}",clazz,_file,_copy.getArtifact()));
-				}
-				getLog().debug(MessageFormat.format("Creating package {0} destiny",clazz));
-				final Path generatedSourceFile=generatePackage(_generatedSourcesPath, clazz, _copy);
-				getLog().debug(MessageFormat.format("Extracting class {0} source",clazz));
-				copySource(sourcePackage, sourceEntry, _copy, generatedSourceFile, _sourceEncoding, _file, clazz);
-			}
-		}catch(JarException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable to open source {0} from artifact {1}",_file,_copy.getArtifact()), e);
-		}
-	}
 
-	private Path generatePackage(final Path _generatedSourcesPath, final String _clazz,final CopyDefinition _copy) throws MojoExecutionException {
+	@SuppressWarnings("UseSpecificCatch")
+	protected Path downloadSource(final ProjectBuildingRequest _buildingRequest,final CopyDefinition _copy, final Path _generatedSourcesPath) throws MojoExecutionException {
 		
-		final Path reply;
+		Path reply;
 		
 		try{
-			reply=_generatedSourcesPath.resolve(_clazz
-													.replaceAll(_copy.toRegexPackage(),_copy.getToPackage())
-													.replace('.','/')+".java");
-			Files.createDirectories(reply.getParent());
-		}catch(IOException e){
-			throw new MojoExecutionException(MessageFormat.format("Failed creating new package to copy: {0}",_copy), e);
+			final Artifact artifact=getArtifactResolver()
+											.resolveArtifact(_buildingRequest, _copy.toCoordinate())
+											.getArtifact();
+			getLog().debug(MessageFormat.format("Found: {0}",artifact));
+			reply=Paths.get(artifact.getFile().getAbsolutePath());
+		}catch(Exception e){
+			throw new MojoExecutionException(MessageFormat.format("Failed processing copy: {0}",_copy.getArtifact()), e);
 		}
 		
-		return reply;
-	}
-
-	private GeneratedFactory getImport(){
-	
-		final String version=this.project.getProperties().getProperty("maven.compiler.target","1.8");
-		return GeneratedFactory.from(version);
-	}
-	
-	private void copySource(final JarFile _sourcePackage, final JarEntry _sourceEntry,final CopyDefinition _copy, final Path _generatedSourceFile, final Charset _sourceEncoding,final File _file,final String _clazz) throws MojoExecutionException {
-
-		final GeneratedFactory factory=getImport();
-		
-		try(BufferedReader sourceReader=new BufferedReader(new InputStreamReader(_sourcePackage.getInputStream(_sourceEntry),Charset.forName(_copy.getSourceCharset())));
-				BufferedWriter sourceWriter=new BufferedWriter(Files.newBufferedWriter(_generatedSourceFile,_sourceEncoding, StandardOpenOption.CREATE,StandardOpenOption.WRITE,StandardOpenOption.TRUNCATE_EXISTING))){
-			String line=sourceReader.readLine();
-			boolean mainFound=false;
-			boolean packageFound=false;
-			boolean isInComment=false;
-			boolean importAdded=false;
-			while(line!=null){
-				packageFound|=isPackage(line);
-				if((!isInComment)&&(isBeginComment(line))){
-					isInComment=true;
-				}else{
-					if(isEndComment(line)){
-						isInComment=false;
-					}
-				}
-				getLog().debug(MessageFormat.format("Extracted class {0} line {1}",_clazz,line));
-				line=line.replaceAll(_copy.toRegexPackage(),_copy.getToPackage());
-				getLog().debug(MessageFormat.format("Modified class {0} line {1}",_clazz,line));
-				if((!isInComment)&&(!mainFound)&&(isMainTypeDefinition(line))){
-					sourceWriter.write(factory.getAnnotation(_copy,this.executionTime));
-					mainFound=true;
-				}
-				sourceWriter.write(line);
-				sourceWriter.write('\n');
-				if((!isInComment)&&(packageFound)&&(!importAdded)){
-					sourceWriter.write(factory.getImport());
-					importAdded=true;
-				}
-				line=sourceReader.readLine();
-			}
-		}catch(IOException|IllegalCharsetNameException|UnsupportedCharsetException e){
-			throw new MojoExecutionException(MessageFormat.format("Unable read source {0} class {1} from artifact {2} with charset {3}",_file,_clazz,_copy.getArtifact(),_copy.getSourceCharset()), e);
-		}
-	}
-	
-	private boolean isPackage(final String _line){
-		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.startsWith("package ");
-	}
-	private boolean isBeginComment(final String _line){
-		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.contains("/*");
-	}
-	private boolean isEndComment(final String _line){
-		
-		final String processingLine=_line.trim().toLowerCase();
-		return processingLine.contains("*/");
-	}
-	
-	private boolean isMainTypeDefinition(final String _line){
-
-		final String[] javaTypes={"class","interface","@interface","enum"};
-		final String processingLine=_line.trim().toLowerCase();
-		boolean reply=false;
-
-
-		for(String javaType:javaTypes){
-			reply|=(processingLine.startsWith(javaType+" "))||(processingLine.contains(" "+javaType+" "));
-		}
-
 		return reply;
 	}
 }

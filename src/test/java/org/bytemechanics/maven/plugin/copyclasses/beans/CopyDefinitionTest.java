@@ -160,10 +160,10 @@ public class CopyDefinitionTest {
 	}
 
 	@Test
-	@DisplayName("toRegexPackage() should replace all dots with double bars the fromPackage value")
-	public void toRegexPackage(){
+	@DisplayName("getFromPackageRegex() should replace all dots with double bars the fromPackage value")
+	public void getFromPackageRegex(){
 		final CopyDefinition copy=new CopyDefinition("myArtifact",new String[]{"myclass1","myclass2"},"mycharset","mypacakge1.mypacakge2.mypacakge3","myToPackage");
-		Assertions.assertEquals("mypacakge1.mypacakge2.mypacakge3",copy.toRegexPackage());
+		Assertions.assertEquals("mypacakge1\\.mypacakge2\\.mypacakge3",copy.getFromPackageRegex());
 	}
 
 	@Test
