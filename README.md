@@ -28,7 +28,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
             (...)
             <plugin>
                <groupId>org.bytemechanics.maven</groupId>
-               <artifactId>copyclasses-maven-plugin</artifactId>
+               <artifactId>copysource-maven-plugin</artifactId>
                <version>X.X.X</version>
            </plugin>
            (...)
@@ -44,7 +44,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
          (...)
          <plugin>
             <groupId>org.bytemechanics.maven</groupId>
-            <artifactId>copyclasses-maven-plugin</artifactId>
+            <artifactId>copysource-maven-plugin</artifactId>
             <version>X.X.X</version>
             <executions>
                <execution>
@@ -67,7 +67,7 @@ _**IMPORTANT NOTE: We strongly recommends to use this plugin only for libraries,
          (...)
          <plugin>
             <groupId>org.bytemechanics.maven</groupId>
-            <artifactId>copyclasses-maven-plugin</artifactId>
+            <artifactId>copysource-maven-plugin</artifactId>
             <version>X.X.X</version>
             <executions>
                <execution>
