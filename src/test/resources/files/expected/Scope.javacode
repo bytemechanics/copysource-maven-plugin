@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 package org.bytemechanics.maven.plugin.copyclasses.enums;
-import javax.annotation.Generated;
+import org.bytemechanics.maven.plugin.copyclasses.annotations.CopiedSource;
 
 import java.nio.file.Path;
 import org.apache.maven.project.MavenProject;
@@ -23,7 +23,7 @@ import org.apache.maven.project.MavenProject;
  *
  * @author afarre
  */
-@Generated(value="generated-by-copy-plugin", comments = "Copied from org.bytemechanics:copy-commons:jar:sources:1.5.0", date = "2020-03-04T17:11:49.805")
+@CopiedSource(tool="org.bytemechanics.maven.copysource-maven-plugin", toolVersion="null", originGroupId="org.bytemechanics", originArtifactId="copy-commons", originVersion="1.5.0", originClassifier="null", copyDate = "2022-08-08T10:54:19.782697")
 public enum Scope {
 
 	SRC("generated-sources"){

@@ -213,7 +213,6 @@ public class CopyClassesBaseTest {
 	public void instantiateCopyService(final @Mocked Build _build){
 		
 		final Properties projectProperties=new Properties();
-		projectProperties.setProperty("maven.compiler.target", "1.9");
 		projectProperties.setProperty("project.build.sourceEncoding", "UTF-16");
 
 		new Expectations() {{
@@ -225,7 +224,6 @@ public class CopyClassesBaseTest {
 		CopyService actual=instance.instantiateCopyService();
 		Assertions.assertEquals(StandardCharsets.UTF_16, actual.getEncoding());
 		Assertions.assertEquals(generatedSourceFolder, actual.getGeneratedSourceFolder());
-		Assertions.assertEquals("1.9", actual.getJavaVersion());
 		Assertions.assertEquals("myDirectory", actual.getTargetFolder());
 	}
 	@Test
@@ -243,7 +241,6 @@ public class CopyClassesBaseTest {
 		CopyService actual=instance.instantiateCopyService();
 		Assertions.assertEquals(StandardCharsets.UTF_8, actual.getEncoding());
 		Assertions.assertEquals(generatedSourceFolder, actual.getGeneratedSourceFolder());
-		Assertions.assertEquals("1.8", actual.getJavaVersion());
 		Assertions.assertEquals("myDirectory", actual.getTargetFolder());
 	}
 	

@@ -149,19 +149,15 @@ public abstract class CopyClassesBase extends AbstractMojo {
 
 	protected CopyService instantiateCopyService(){
 
-		final String javaVersion=getProject()
-									.getProperties()
-										.getProperty("maven.compiler.target","1.8");
-		getLog().debug(MessageFormat.format("Java version: {0}",javaVersion));
 		final String encoding=getProject()
-									.getProperties()
-										.getProperty("project.build.sourceEncoding",Charset.defaultCharset().name());
+										.getProperties()
+											.getProperty("project.build.sourceEncoding",Charset.defaultCharset().name());
 		getLog().debug(MessageFormat.format("Source encoding: {0}",encoding));
 		final String targetFolder=getProject()
-									.getBuild()
-										.getDirectory();
+											.getBuild()
+												.getDirectory();
 		getLog().debug(MessageFormat.format("Target folder: {0}",targetFolder));
-		return new CopyServiceImpl(getLog(),javaVersion,targetFolder,getGeneratedSourceFolder(),Charset.forName(encoding));
+		return new CopyServiceImpl(getLog(),targetFolder,getGeneratedSourceFolder(),Charset.forName(encoding));
 	}
 	
 	protected void generateSources(final Scope _scope) throws MojoExecutionException {
@@ -176,6 +172,8 @@ public abstract class CopyClassesBase extends AbstractMojo {
 
 		getLog().debug("Process copies");
 		for(CopyDefinition copy:getCopies()){
+			getLog().info(MessageFormat.format("Prepare environment for:\n {0}",copy));
+			copyService.prepareEnvironment(generatedSourcesPath, copy);
 			getLog().info(MessageFormat.format("Process copy: {0}",copy));
 			final Path downloadedFile=downloadSource(buildingRequest, copy, generatedSourcesPath);
 			getLog().debug(MessageFormat.format("Process copy {0} >> Downloaded source: {1}",copy,downloadedFile));
@@ -203,7 +201,7 @@ public abstract class CopyClassesBase extends AbstractMojo {
 			final Artifact artifact=getArtifactResolver()
 											.resolveArtifact(_buildingRequest, _copy.toCoordinate())
 											.getArtifact();
-			getLog().debug(MessageFormat.format("Found: {0}",artifact));
+	getLog().info(MessageFormat.format("Found: {0}",artifact));
 			reply=Paths.get(artifact.getFile().getAbsolutePath());
 		}catch(Exception e){
 			throw new MojoExecutionException(MessageFormat.format("Failed processing copy: {0}",_copy.getArtifact()), e);
