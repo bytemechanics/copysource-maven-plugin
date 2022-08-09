@@ -28,12 +28,12 @@ import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
  */
 public interface CopyService {
 
-	public String getJavaVersion();
 	public LocalDateTime getExecutionTime();
 	public String getTargetFolder();
 	public String getGeneratedSourceFolder();
 	public Charset getEncoding();
 
+	public default void prepareEnvironment(final Path _generatedSourcesPath,final CopyDefinition _copy) throws MojoExecutionException{}
 	public Path generateSourcePath(final Scope _scope) throws MojoExecutionException;
 	public void createManifest(final CopyDefinition[] _copies,final Path generatedSourcesPath) throws MojoExecutionException;
 	public void processDownloadedSource(final Path _sourceFile,final CopyDefinition _copy,final Path _generatedSourcesPath) throws MojoExecutionException;

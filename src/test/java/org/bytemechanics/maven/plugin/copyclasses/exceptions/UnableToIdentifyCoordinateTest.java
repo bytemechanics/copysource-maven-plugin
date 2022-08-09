@@ -48,7 +48,7 @@ public class UnableToIdentifyCoordinateTest {
 	}
 
 	@BeforeEach
-    void beforeEachTest(final TestInfo testInfo) {
+    public void beforeEachTest(final TestInfo testInfo) {
         System.out.println(">>>>> "+this.getClass().getSimpleName()+" >>>> "+testInfo.getTestMethod().map(Method::getName).orElse("Unkown")+""+testInfo.getTags().toString()+" >>>> "+testInfo.getDisplayName());
 	}
 	

@@ -15,7 +15,6 @@
  */
 package org.bytemechanics.maven.plugin.copyclasses.services;
 
-import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Method;
@@ -28,12 +27,9 @@ import java.nio.file.attribute.FileAttribute;
 import java.time.LocalDateTime;
 import java.util.Optional;
 import java.util.concurrent.atomic.AtomicBoolean;
-import java.util.jar.JarEntry;
-import java.util.jar.JarFile;
 import java.util.logging.LogManager;
 import java.util.logging.Logger;
 import java.util.stream.Stream;
-import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import mockit.Expectations;
 import mockit.Injectable;
@@ -43,9 +39,10 @@ import mockit.Mocked;
 import mockit.Tested;
 import org.apache.maven.plugin.MojoExecutionException;
 import org.apache.maven.plugin.logging.Log;
+import org.apache.maven.shared.transfer.artifact.ArtifactCoordinate;
 import org.bytemechanics.maven.plugin.copyclasses.beans.CopyDefinition;
-import org.bytemechanics.maven.plugin.copyclasses.enums.GeneratedFactory;
 import org.bytemechanics.maven.plugin.copyclasses.enums.Scope;
+import org.bytemechanics.maven.plugin.copyclasses.mocks.LogMock;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.BeforeEach;
@@ -79,11 +76,8 @@ public class CopyServiceImplTest {
         System.out.println(">>>>> "+this.getClass().getSimpleName()+" >>>> "+testInfo.getTestMethod().map(Method::getName).orElse("Unkown")+""+testInfo.getTags().toString()+" >>>> "+testInfo.getDisplayName());
 	}
 
-	@Mocked 
-	@Injectable
-	Log logger;
-	@Injectable( "1.8")
-	String _javaVersion;
+	@Injectable()
+	Log logger=new LogMock(CopyServiceImpl.class,LogMock.Level.DEBUG);
 	@Injectable( "target/generated-sources")
 	String _targetFolder;
 	@Injectable("copies")
@@ -174,17 +168,18 @@ public class CopyServiceImplTest {
 								"From artifact [mySecondArtifact]:\n" +
 								"	[second.destiny.package.class1] repackaged from [my.second.original.package.class1]\n" +
 								"	[second.destiny.package.class2] repackaged from [my.second.original.package.class2]\n" +
-								"	[second.destiny.package.class3] repackaged from [my.second.original.package.class3]\n";
-
+								"	[second.destiny.package.class3] repackaged from [my.second.original.package.class3]\n" +
+								"From artifact [org.bytemechanics.maven:copysource-maven-plugin:"+this.getClass().getPackage().getImplementationVersion()+"]:\n" +
+								"	["+CopyServiceImpl.CUSTOM_ANNOTATION_CLASS+"] generated";
 		new Expectations() {{
-			_copy1.getArtifact(); result="myFirstArtifact"; times=1;
-			_copy1.getClasses(); result=new String[]{"my.first.original.package.class1","my.first.original.package.class2","my.first.original.package.class3"}; times=1;
-			_copy1.getFromPackage(); result="my.first.original.package"; times=3;
-			_copy1.getToPackage(); result="first.destiny.package"; times=3;
-			_copy2.getArtifact(); result="mySecondArtifact"; times=1;
-			_copy2.getClasses(); result=new String[]{"my.second.original.package.class1","my.second.original.package.class2","my.second.original.package.class3"}; times=1;
-			_copy2.getFromPackage(); result="my.second.original.package"; times=3;
-			_copy2.getToPackage(); result="second.destiny.package"; times=3;
+			_copy1.getArtifact(); result="myFirstArtifact"; minTimes=1;
+			_copy1.getClasses(); result=new String[]{"my.first.original.package.class1","my.first.original.package.class2","my.first.original.package.class3"}; minTimes=1;
+			_copy1.getFromPackage(); result="my.first.original.package"; minTimes=1;
+			_copy1.getToPackage(); result="first.destiny.package"; minTimes=1;
+			_copy2.getArtifact(); result="mySecondArtifact"; minTimes=1;
+			_copy2.getClasses(); result=new String[]{"my.second.original.package.class1","my.second.original.package.class2","my.second.original.package.class3"}; minTimes=1;
+			_copy2.getFromPackage(); result="my.second.original.package"; minTimes=1;
+			_copy2.getToPackage(); result="second.destiny.package"; minTimes=1;
 		}};
 
 		instance.createManifest(copies,generatedFolder);
@@ -244,14 +239,11 @@ public class CopyServiceImplTest {
 		new Expectations() {{
 			_copy.getClasses(); result=new String[]{"org.bytemechanics.commons.collections.FastDropLastQueue","org.bytemechanics.commons.lang.ArrayUtils","org.bytemechanics.commons.string.Figlet"};
 			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.collections.FastDropLastQueue", _copy); result=Optional.of(generatedSourcesQueuePath); times=1;
-			instance.generatePackage(generatedSourcesQueuePath); times=1;
-			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesQueuePath,downloadedFile,"org.bytemechanics.commons.collections.FastDropLastQueue"); times=1;
+			instance.copySource((InputStream)any,generatedSourcesQueuePath,"org.bytemechanics.commons.collections.FastDropLastQueue",_copy,true); times=1;
 			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.lang.ArrayUtils", _copy); result=Optional.of(generatedSourcesArrayPath); times=1;
-			instance.generatePackage(generatedSourcesArrayPath); times=1;
-			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesArrayPath,downloadedFile,"org.bytemechanics.commons.lang.ArrayUtils"); times=1;
+			instance.copySource((InputStream)any,generatedSourcesArrayPath,"org.bytemechanics.commons.lang.ArrayUtils",_copy,true); times=1;
 			instance.generateSourceFile(generatedSourcesPath, "org.bytemechanics.commons.string.Figlet", _copy); result=Optional.of(generatedSourcesFigletPath); times=1;
-			instance.generatePackage(generatedSourcesFigletPath); times=1;
-			instance.copySource((JarFile)any,(JarEntry)any,_copy,generatedSourcesFigletPath,downloadedFile,"org.bytemechanics.commons.string.Figlet"); times=1;
+			instance.copySource((InputStream)any,generatedSourcesFigletPath,"org.bytemechanics.commons.string.Figlet",_copy,true); times=1;
 		}};
 		instance.processDownloadedSource(downloadedFile, _copy, generatedSourcesPath);
 	}		
@@ -292,14 +284,23 @@ public class CopyServiceImplTest {
 								,"Failed creating new package for file: first/second/myfile.java}");
 	}
 	
-	@ParameterizedTest(name = "getGeneratedAnnotationFactory() for line {0} verification")
-	@EnumSource(GeneratedFactory.class)
-	public void getGeneratedAnnotationFactory(final GeneratedFactory _generatedFactory){
-		
+	@Test
+	@DisplayName("Verify getAnnotation() is correctly generated as: @Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from myGroupId:myArtifactId:myVersion:myClassifier\", date = \"***\")")
+	public void getAnnotation(final @Mocked CopyDefinition _copy, final @Mocked ArtifactCoordinate _artifactCoordinate){
+		System.out.println(">>> GeneratedFactoryTest >>> getAnnotation");
+		final LocalDateTime executionTime=LocalDateTime.now();
+		String expected="@CopiedSource(tool=\"org.bytemechanics.maven.copysource-maven-plugin\", toolVersion=\"null\", originGroupId=\"myGroupId\", originArtifactId=\"myArtifactId\", originVersion=\"myVersion\", originClassifier=\"myClassifier\", copyDate = \""+executionTime.toString()+"\")";
+
 		new Expectations() {{
-			instance.getJavaVersion(); result=_generatedFactory.version; times=1;
+			_copy.toCoordinate(); result=_artifactCoordinate; times=1;
+			_artifactCoordinate.getGroupId(); result="myGroupId"; times=1;
+			_artifactCoordinate.getArtifactId(); result="myArtifactId"; times=1;
+			_artifactCoordinate.getVersion(); result="myVersion"; times=1;
+			_artifactCoordinate.getClassifier(); result="myClassifier"; times=1;
 		}};
-		Assertions.assertSame(_generatedFactory, instance.getGeneratedAnnotationFactory());
+		
+		final String actual=instance.getAnnotation(_copy, executionTime);
+		Assertions.assertEquals(expected, actual);
 	}
 	
 	static Stream<Arguments> copySourceDataPack() {
@@ -311,7 +312,7 @@ public class CopyServiceImplTest {
 	@ParameterizedTest(name = "copySource() for file {0} should generate a file with @Generated annotation with the package changed at {1}")
 	@MethodSource("copySourceDataPack")
 	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
-	public void copySource(final String _clazz,final String _target,final @Mocked GeneratedFactory _generatedfactory,final @Mocked CopyDefinition _copy) throws MojoExecutionException, IOException {
+	public void copySource(final String _clazz,final String _target,final @Mocked CopyDefinition _copy,final @Mocked ArtifactCoordinate _artifactCoordinate) throws MojoExecutionException, IOException {
 		
 		final Path originalFolder=Paths.get("src/test/resources/files/original");
 		final Path expectedFolder=Paths.get("src/test/resources/files/expected");
@@ -322,33 +323,15 @@ public class CopyServiceImplTest {
 		final Path generatedSourceFile=generatedFolder.resolve(_target);
 		Files.createDirectories(generatedSourceFile.getParent());
 		
-		
-		class JarFileMock extends JarFile{
-
-			public JarFileMock(final File _file) throws IOException {
-				super(_file);
-			}
-
-			@Override
-			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
-				return Files.newInputStream(originalSourceFile);
-			}
-		}
-		
 		new Expectations() {{
-			instance.getGeneratedAnnotationFactory(); result=_generatedfactory;
 			instance.getEncoding(); result=StandardCharsets.UTF_8;
-			_generatedfactory.getAnnotation(_copy,(LocalDateTime) any); result="@Generated(value=\"generated-by-copy-plugin\", comments = \"Copied from org.bytemechanics:copy-commons:jar:sources:1.5.0\", date = \"2020-03-04T17:11:49.805\")\n";
-			_generatedfactory.getImport(); result="import javax.annotation.Generated;\n";
+			instance.getAnnotation(_copy,(LocalDateTime)any); result="@CopiedSource(tool=\"org.bytemechanics.maven.copysource-maven-plugin\", toolVersion=\"null\", originGroupId=\"org.bytemechanics\", originArtifactId=\"copy-commons\", originVersion=\"1.5.0\", originClassifier=\"null\", copyDate = \"2022-08-08T10:54:19.782697\")";
 			_copy.getFromPackageRegex(); result="org\\.bytemechanics\\.commons\\.functional";
 			_copy.getToPackage(); result="com.mypackage2.matched.true";
 			_copy.getSourceCharset(); result="UTF-8";
 		}};
-		
-		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
-		final File file=fakejar.toFile();
-		try(JarFileMock jarFile=new JarFileMock(file)){
-			instance.copySource(jarFile, new JarEntry("none"), _copy, generatedSourceFile, originalSourceFile, _clazz);
+		try(InputStream inputStream=Files.newInputStream(originalSourceFile)){
+			instance.copySource(inputStream,generatedSourceFile,_clazz,_copy,true); 
 			Assertions.assertEquals(Files.readAllLines(expectedSourceFile,StandardCharsets.UTF_8),Files.readAllLines(generatedSourceFile,StandardCharsets.UTF_8));
 		}catch(Exception e){
 			e.printStackTrace();
@@ -358,10 +341,10 @@ public class CopyServiceImplTest {
 	@Test
 	@DisplayName("copySource() with non readable source file should raise MojoExecutionException")
 	@SuppressWarnings({"CallToPrintStackTrace", "CallToPrintStackTrace", "ThrowableResultIgnored", "ThrowableResultIgnored"})
-	public void copySource_read_failure(final @Mocked CopyDefinition _copy) throws MojoExecutionException, IOException {
+	public void copySource_read_failure(final @Mocked CopyDefinition _copy,final @Mocked InputStream _istream) throws MojoExecutionException, IOException {
 		
 		final String clazz="org.bytemechanics.commons.functional.LambdaUnchecker";
-		final String target="com/mypackage2/matched/true/LambdaUnchecker.java";
+		final String target="com/mypackage2/matched/true/LambdaUncheckerBinary.java";
 		final Path originalFolder=Paths.get("src/test/resources/files/original");
 		final Path generatedFolder=Paths.get("target/tests/copySource_read_failure");
 		final String fileName=Paths.get(target).getFileName().toString()+"code";
@@ -369,27 +352,12 @@ public class CopyServiceImplTest {
 		final Path generatedSourceFile=generatedFolder.resolve(target);
 		Files.createDirectories(generatedSourceFile.getParent());
 		
-		
-		class JarFileMock extends JarFile{
-
-			public JarFileMock(final File _file) throws IOException {
-				super(_file);
-			}
-
-			@Override
-			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
-				throw new IOException("input not readable");
-			}
-		}
-		
 		new Expectations() {{
-			instance.getGeneratedAnnotationFactory(); result=GeneratedFactory.JDK8;
+			_copy.getSourceCharset(); result="UTF-8"; minTimes=0;
 		}};
 		
-		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
-		final File file=fakejar.toFile();
-		try(JarFileMock jarFile=new JarFileMock(file)){
-			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), _copy, generatedSourceFile,  originalSourceFile, clazz));
+		try{
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(_istream,originalSourceFile,clazz,_copy,true));
 		}catch(Exception e){
 			e.printStackTrace();
 			Assertions.fail("Should not raise an exception here",e);
@@ -410,27 +378,12 @@ public class CopyServiceImplTest {
 		Files.createDirectories(generatedSourceFile.getParent());
 		
 		
-		class JarFileMock extends JarFile{
-
-			public JarFileMock(final File _file) throws IOException {
-				super(_file);
-			}
-
-			@Override
-			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
-				return Files.newInputStream(originalSourceFile);
-			}
-		}
-		
 		new Expectations() {{
-			instance.getGeneratedAnnotationFactory(); result=GeneratedFactory.JDK8;
 			_copy.getSourceCharset(); result="my-failure-charset";
 		}};
 		
-		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
-		final File file=fakejar.toFile();
-		try(JarFileMock jarFile=new JarFileMock(file)){
-			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), _copy, generatedSourceFile, originalSourceFile, clazz));
+		try(InputStream inputStream=Files.newInputStream(originalSourceFile)){
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(inputStream,originalSourceFile,clazz,_copy,true));
 		}catch(Exception e){
 			e.printStackTrace();
 			Assertions.fail("Should not raise an exception here",e);
@@ -451,27 +404,12 @@ public class CopyServiceImplTest {
 		Files.createDirectories(generatedSourceFile.getParent());
 		
 		
-		class JarFileMock extends JarFile{
-
-			public JarFileMock(final File _file) throws IOException {
-				super(_file);
-			}
-
-			@Override
-			public synchronized InputStream getInputStream(ZipEntry ze) throws IOException {
-				return Files.newInputStream(originalSourceFile);
-			}
-		}
-		
 		new Expectations() {{
-			instance.getGeneratedAnnotationFactory(); result=GeneratedFactory.JDK8;
 			_copy.getSourceCharset(); result="UTF-128";
 		}};
 		
-		final Path fakejar=Paths.get("src/test/resources/files/fakeJar.jar");	
-		final File file=fakejar.toFile();
-		try(JarFileMock jarFile=new JarFileMock(file)){
-			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(jarFile, new JarEntry("none"), _copy, generatedSourceFile,originalSourceFile, clazz));
+		try(InputStream inputStream=Files.newInputStream(originalSourceFile)){
+			Assertions.assertThrows(MojoExecutionException.class,() -> instance.copySource(inputStream,originalSourceFile,clazz,_copy,true)); 
 		}catch(Exception e){
 			e.printStackTrace();
 			Assertions.fail("Should not raise an exception here",e);
