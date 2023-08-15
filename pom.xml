@@ -42,7 +42,7 @@
 	
 	<properties>
 		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-		<maven.version>3.6.3</maven.version>
+		<maven.version>3.8.1</maven.version>
 		<artifact-transfer.version>0.12.0</artifact-transfer.version>
 		<plugin-annotation.version>3.6.0</plugin-annotation.version>
 	</properties>
